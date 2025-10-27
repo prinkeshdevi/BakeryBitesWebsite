@@ -59,8 +59,17 @@ export default function Navigation() {
             </a>
           </div>
 
-          {/* Mobile Menu Button */}
-          <div className="lg:hidden">
+          {/* Right section on mobile: logo + hamburger */}
+          <div className="lg:hidden flex items-center gap-3">
+            <a href="/" aria-label="Bakery Bites logo" className="block">
+              <img
+                src="/assets/WhatsApp%20Image%202025-10-27%20at%2021.30.54_88b1f8cf_1761586559405.jpg"
+                alt="Bakery Bites - 100% Eggless Baking House logo"
+                className="h-8 w-auto object-contain rounded-md shadow-sm"
+                loading="eager"
+                decoding="async"
+              />
+            </a>
             <Button
               variant="ghost"
               size="icon"
