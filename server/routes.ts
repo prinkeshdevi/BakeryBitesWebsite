@@ -12,7 +12,9 @@ import {
 } from "../shared/schema";
 
 // Configure multer for file uploads
-const uploadDir = path.join(process.cwd(), "uploads");
+// On Vercel serverless, the filesystem is read-only except for /tmp
+const baseUploadDir = process.env.VERCEL ? "/tmp" : process.cwd();
+const uploadDir = path.join(baseUploadDir, "uploads");
 if (!existsSync(uploadDir)) {
   mkdirSync(uploadDir, { recursive: true });
 }
