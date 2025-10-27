@@ -1,4 +1,4 @@
-import type { Express } from "express";
+import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import multer from "multer";
@@ -21,10 +21,10 @@ if (!existsSync(uploadDir)) {
 }
 
 const multerStorage = multer.diskStorage({
-  destination: (req, file, cb) => {
+  destination: (req: Request, file: Express.Multer.File, cb: (error: any, destination: string) => void) => {
     cb(null, uploadDir);
   },
-  filename: (req, file, cb) => {
+  filename: (req: Request, file: Express.Multer.File, cb: (error: any, filename: string) => void) => {
     const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
     cb(null, uniqueSuffix + path.extname(file.originalname));
   },
@@ -33,7 +33,7 @@ const multerStorage = multer.diskStorage({
 const upload = multer({
   storage: multerStorage,
   limits: { fileSize: 10 * 1024 * 1024 }, // 10MB
-  fileFilter: (req, file, cb) => {
+  fileFilter: (req: Request, file: Express.Multer.File, cb: multer.FileFilterCallback) => {
     const allowedTypes = /jpeg|jpg|png|gif|mp4|mov|avi/;
     const extname = allowedTypes.test(
       path.extname(file.originalname).toLowerCase()
@@ -49,11 +49,11 @@ const upload = multer({
 });
 
 // Authentication middleware that supports both session and JWT cookie
-function requireAuth(req: any, res: any, next: any) {
-  const sessionId = req.session?.adminId;
+function requireAuth(req: Request, res: Response, next: NextFunction) {
+  const sessionId = (req as any).session?.adminId as string | undefined;
   const jwtId = getAdminIdFromReq(req);
   if (sessionId || jwtId) {
-    req.adminId = sessionId || jwtId;
+    (req as any).adminId = sessionId || jwtId;
     next();
   } else {
     res.status(401).json({ error: "Unauthorized" });
@@ -158,11 +158,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     upload.single("image"),
     async (req, res) => {
       try {
-        if (!req.file) {
+        const mreq = req as Request & { file?: Express.Multer.File };
+        if (!mreq.file) {
           return res.status(400).json({ error: "No file uploaded" });
         }
 
-        const imageUrl = `/uploads/${req.file.filename}`;
+        const imageUrl = `/uploads/${mreq.file.filename}`;
         const images = await storage.getAllSlideshowImages();
         const maxOrder = images.length > 0 ? Math.max(...images.map((i) => i.order)) : -1;
 
