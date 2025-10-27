@@ -1,0 +1,22 @@
+ fully responsive Gen-Z aesthetic bakery website for Bakery Bites optimized for all devices with Instagram integration, admin panel, and complete branding
+I'll include the following features:
+
+Fully responsive design optimized for mobile phones, tablets, desktops, and large screens with adaptive layouts
+Navigation bar with Bakery Bites logo (100% EGGLESS - Bakery bites21 - BAKING HOUSE), Instagram link, and mobile hamburger menu
+Instagram follow pop-up notification that appears when website opens with link to https://www.instagram.com/bakery_bites21/?hl=eng (responsive modal)
+Hero section with smooth auto-playing slideshow featuring cake photos with modern transitions, optimized for all screen sizes
+Gen-Z optimized design with trendy aesthetics: gradient accents, soft shadows, rounded corners, and modern typography that scales beautifully
+'Most Popular' section with responsive grid layout (1 column on mobile, 2-3 on tablet, 4 on desktop) with hover effects
+'Our Choice' section with adaptive layout featuring chef-recommended and signature cakes
+Customized cake order form with mobile-friendly input fields and touch-optimized controls
+Ready-to-order cake catalog with responsive image galleries and categories
+Contact Us section with fully responsive vertical form layout (Name, Email, Message fields) with touch-friendly brown submit button
+Online order booking system optimized for mobile with click-to-call for +91 8788463432
+Responsive embedded Google Maps location (17°41'06.0"N 73°59'25.7"E) that adapts to screen size
+Admin panel (/admin route) with responsive dashboard, password protection, and mobile-friendly controls
+Admin dashboard to upload/manage photos and videos with drag-and-drop interface working on all devices
+Admin controls for slideshow settings, content management, and category organization with touch-optimized UI
+Image and video upload functionality with preview, optimized for mobile and desktop browsers
+Footer with '© 2023 Bakery Bites. All rights reserved.' that adapts to screen width
+Vibrant Gen-Z color palette with pastel pinks, sage greens, warm neutrals, and brown accents
+Mobile-first approach with progressive enhancement for larger screens, smooth scroll animations, and touch gestures support
