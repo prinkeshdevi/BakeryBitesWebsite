@@ -1,11 +1,12 @@
 {
   "version": 2,
   "buildCommand": "npm run build:web",
+  "ignoreCommand": "echo 'always-build'",
   "builds": [
     {
       "src": "package.json",
       "use": "@vercel/static-build",
-      "config": { "distDir": "dist/public", "buildCommand": "npm run build:web" }
+      "config": { "distDir": "dist/public", "buildCommand": "npm run build:web", "installCommand": "npm ci" }
     },
     {
       "src": "api/index.ts",

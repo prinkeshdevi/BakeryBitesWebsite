@@ -60,6 +60,16 @@ app.get("/api/health", (_req, res) => {
   });
 });
 
+// Build/version info for diagnosing stale deploys
+app.get("/api/version", (_req, res) => {
+  res.json({
+    vercel: Boolean(process.env.VERCEL),
+    branch: process.env.VERCEL_GIT_COMMIT_REF || null,
+    commit: process.env.VERCEL_GIT_COMMIT_SHA || null,
+    buildAt: new Date().toISOString(),
+  });
+});
+
 // DB connectivity health check
 app.get("/api/db/health", async (_req, res) => {
   try {
