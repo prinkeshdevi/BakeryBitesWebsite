@@ -10,7 +10,7 @@ export default function Navigation() {
     <nav className="sticky top-0 z-50 w-full bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 border-b border-border">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16 lg:h-20">
-          {/* Logo */}
+          {/* Logo (left text brand) */}
           <Link href="/">
             <div
               className="flex items-center space-x-2 hover-elevate rounded-lg px-3 py-2 -ml-3 transition-all duration-300 cursor-pointer"
@@ -28,7 +28,7 @@ export default function Navigation() {
             </div>
           </Link>
 
-          {/* Desktop Navigation */}
+          {/* Desktop Navigation + Top-right image logo */}
           <div className="hidden lg:flex items-center space-x-6">
             <a
               href="https://www.instagram.com/bakery_bites21/?hl=eng"
@@ -47,6 +47,16 @@ export default function Navigation() {
             >
               <a href="tel:+918788463432">Order Now</a>
             </Button>
+            {/* Right-top logo image */}
+            <a href="/" aria-label="Bakery Bites logo" className="block">
+              <img
+                src="/assets/WhatsApp%20Image%202025-10-27%20at%2021.30.54_88b1f8cf_1761586559405.jpg"
+                alt="Bakery Bites - 100% Eggless Baking House logo"
+                className="h-12 w-auto object-contain rounded-md shadow-sm hover:opacity-90 transition-opacity"
+                loading="eager"
+                decoding="async"
+              />
+            </a>
           </div>
 
           {/* Mobile Menu Button */}
