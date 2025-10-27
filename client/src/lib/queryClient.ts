@@ -22,6 +22,7 @@ export async function apiRequest(
 ): Promise<Response> {
   const upper = method.toUpperCase();
   const hasBody = data !== undefined && upper !== "GET" && upper !== "HEAD";
+  const isFormData = typeof FormData !== "undefined" && data instanceof FormData;
 
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 10000); // 10s safety timeout
@@ -29,8 +30,8 @@ export async function apiRequest(
   try {
     const res = await fetch(url, {
       method: upper,
-      headers: hasBody ? { "Content-Type": "application/json" } : {},
-      body: hasBody ? JSON.stringify(data) : undefined,
+      headers: hasBody && !isFormData ? { "Content-Type": "application/json" } : {},
+      body: hasBody ? (isFormData ? (data as any) : JSON.stringify(data)) : undefined,
       credentials: "include",
       signal: controller.signal,
     });
