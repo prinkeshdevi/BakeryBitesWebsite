@@ -70,6 +70,45 @@ app.get("/api/admin/check", async (req, res) => {
   }
 });
 
+function extractCreds(req: any) {
+  try {
+    const hasBody = req.body && (req.body.username !== undefined || req.body.password !== undefined);
+    if (hasBody) {
+      return {
+        username: String(req.body.username ?? "").trim(),
+        password: String(req.body.password ?? "").trim(),
+        source: "json",
+      };
+    }
+    // Try rawBody JSON
+    if (req.rawBody) {
+      try {
+        const parsed = JSON.parse(Buffer.from(req.rawBody).toString("utf8"));
+        if (parsed && (parsed.username || parsed.password)) {
+          return {
+            username: String(parsed.username ?? "").trim(),
+            password: String(parsed.password ?? "").trim(),
+            source: "raw",
+          };
+        }
+      } catch {
+        // ignore
+      }
+    }
+    // Try query params (debug fallback)
+    if (req.query && (req.query.username || req.query.password)) {
+      return {
+        username: String(req.query.username ?? "").trim(),
+        password: String(req.query.password ?? "").trim(),
+        source: "query",
+      };
+    }
+  } catch {
+    // ignore
+  }
+  return { username: "", password: "", source: "none" };
+}
+
 // Always-available admin login that accepts default credentials
 app.post("/api/admin/login", async (req, res, next) => {
   try {
@@ -78,8 +117,9 @@ app.post("/api/admin/login", async (req, res, next) => {
       import("../server/storage"),
     ]);
 
-    const username = String(req.body?.username || "").trim().toLowerCase();
-    const password = String(req.body?.password || "").trim();
+    const creds = extractCreds(req);
+    const usernameLc = creds.username.toLowerCase();
+    const password = creds.password;
 
     const defaults = [
       { username: "apurva", password: "bakerybites2025" },
@@ -87,7 +127,7 @@ app.post("/api/admin/login", async (req, res, next) => {
     ];
 
     const matchedDefault = defaults.find(
-      (d) => username === d.username && password === d.password
+      (d) => usernameLc === d.username && password === d.password
     );
 
     if (matchedDefault) {
@@ -98,7 +138,6 @@ app.post("/api/admin/login", async (req, res, next) => {
           (req as any).session.adminId = admin.id;
           setAdminAuth(res as any, admin.id);
         } else {
-          // If storage not ready or user missing, use stable id
           (req as any).session.adminId = `default-${matchedDefault.username}`;
           setAdminAuth(res as any, `default-${matchedDefault.username}`);
         }
@@ -106,7 +145,7 @@ app.post("/api/admin/login", async (req, res, next) => {
         (req as any).session.adminId = `default-${matchedDefault.username}`;
         setAdminAuth(res as any, `default-${matchedDefault.username}`);
       }
-      return res.json({ message: "Login successful" });
+      return res.json({ message: "Login successful", parsedFrom: creds.source });
     }
 
     // If not default, pass through to full routes (if loaded) or return 401 later
