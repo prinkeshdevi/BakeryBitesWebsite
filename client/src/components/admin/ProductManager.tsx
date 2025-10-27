@@ -79,9 +79,10 @@ export default function ProductManager() {
       const formData = new FormData();
       formData.append("image", file);
       const response = await apiRequest("POST", "/api/upload", formData);
-      return response;
+      const json = await response.json();
+      return json as { url: string };
     },
-    onSuccess: (data: any) => {
+    onSuccess: (data: { url: string }) => {
       form.setValue("imageUrl", data.url);
       toast({ title: "Image uploaded successfully" });
     },
