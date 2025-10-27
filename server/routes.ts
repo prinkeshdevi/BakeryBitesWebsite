@@ -70,7 +70,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const username = String(rawUsername).trim();
       const password = String(rawPassword).trim();
 
-      const admin = await storage.getAdminByUsername(username);
+      let admin = await storage.getAdminByUsername(username);
+
+      // Ensure default admin exists if trying to log in with the configured account
+      const defaultUsername = "apurva";
+      const defaultPassword = "bakerybites2025";
+
+      if (!admin && username.toLowerCase() === defaultUsername) {
+        // auto-create default admin if not present
+        admin = await storage.createAdmin({ username: defaultUsername, password: defaultPassword });
+      }
 
       if (!admin || admin.password !== password) {
         return res.status(401).json({ error: "Invalid credentials" });
