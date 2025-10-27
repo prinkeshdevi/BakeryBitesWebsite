@@ -184,15 +184,63 @@ let fullRoutesReady = false;
     // eslint-disable-next-line no-console
     console.error("Failed to register routes:", msg);
 
-    // Minimal fallbacks so orders and contacts can still be submitted
+    // Minimal fallbacks so uploads, orders and contacts can still be submitted
     let memoryOrders: any[] = [];
     let memoryContacts: any[] = [];
 
     // Load helpers and validation schema lazily
-    const [{ clearAdminAuth }, { insertCustomOrderSchema, insertContactSchema }] = await Promise.all([
+    const [
+      { clearAdminAuth },
+      { insertCustomOrderSchema, insertContactSchema },
+      fsMod,
+      multerMod,
+    ] = await Promise.all([
       import("../server/auth"),
       import("../shared/schema"),
+      import("fs"),
+      import("multer"),
     ]);
+
+    const fs = fsMod as any;
+    const multer: any = (multerMod as any).default ?? (multerMod as any);
+
+    // Ensure uploads dir exists
+    const uploadsDir = path.join(baseUploadDir, "uploads");
+    try {
+      if (!fs.existsSync(uploadsDir)) {
+        fs.mkdirSync(uploadsDir, { recursive: true });
+      }
+    } catch {}
+
+    // Minimal upload handler (public, to support /media without auth)
+    const storage = multer.diskStorage({
+      destination: (_req: any, _file: any, cb: any) => cb(null, uploadsDir),
+      filename: (_req: any, file: any, cb: any) => {
+        const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
+        const ext = path.extname(file.originalname || "") || "";
+        cb(null, uniqueSuffix + ext);
+      },
+    });
+    const upload = multer({
+      storage,
+      limits: { fileSize: 10 * 1024 * 1024 },
+      fileFilter: (_req: any, file: any, cb: any) => {
+        const allowed = /jpeg|jpg|png|gif|mp4|mov|avi|webm|mkv/;
+        const ok = allowed.test((file.mimetype || "").toLowerCase()) || allowed.test((file.originalname || "").toLowerCase());
+        if (ok) return cb(null, true);
+        cb(new Error("Only images and videos are allowed"));
+      },
+    });
+
+    app.post("/api/upload", upload.single("image"), (req, res) => {
+      try {
+        const file = (req as any).file;
+        if (!file) return res.status(400).json({ error: "No file uploaded" });
+        return res.json({ url: `/uploads/${file.filename}` });
+      } catch {
+        return res.status(500).json({ error: "Failed to upload file" });
+      }
+    });
 
     app.post("/api/admin/logout", (_req, res) => {
       clearAdminAuth(res as any);

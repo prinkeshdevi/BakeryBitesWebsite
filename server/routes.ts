@@ -303,8 +303,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // File Upload Route (for product images)
-  app.post("/api/upload", requireAuth, upload.single("image"), (req, res) => {
+  // File Upload Route (for product images) - public to support /media without auth
+  app.post("/api/upload", upload.single("image"), (req, res) => {
     try {
       const mreq = req as Request & { file?: any };
       if (!mreq.file) {
