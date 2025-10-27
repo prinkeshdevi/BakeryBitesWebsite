@@ -7,6 +7,14 @@ async function throwIfResNotOk(res: Response) {
   }
 }
 
+function withTimeout<T>(promise: Promise<T>, ms: number, errMsg: string): Promise<T> {
+  let timer: any;
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new Error(errMsg)), ms);
+  });
+  return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
+}
+
 export async function apiRequest(
   method: string,
   url: string,
@@ -15,15 +23,23 @@ export async function apiRequest(
   const upper = method.toUpperCase();
   const hasBody = data !== undefined && upper !== "GET" && upper !== "HEAD";
 
-  const res = await fetch(url, {
-    method: upper,
-    headers: hasBody ? { "Content-Type": "application/json" } : {},
-    body: hasBody ? JSON.stringify(data) : undefined,
-    credentials: "include",
-  });
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 10000); // 10s safety timeout
 
-  await throwIfResNotOk(res);
-  return res;
+  try {
+    const res = await fetch(url, {
+      method: upper,
+      headers: hasBody ? { "Content-Type": "application/json" } : {},
+      body: hasBody ? JSON.stringify(data) : undefined,
+      credentials: "include",
+      signal: controller.signal,
+    });
+
+    await throwIfResNotOk(res);
+    return res;
+  } finally {
+    clearTimeout(timeoutId);
+  }
 }
 
 type UnauthorizedBehavior = "returnNull" | "throw";
@@ -32,16 +48,24 @@ export const getQueryFn: <T>(options: {
 }) => QueryFunction<T> =
   ({ on401: unauthorizedBehavior }) =>
   async ({ queryKey }) => {
-    const res = await fetch(queryKey.join("/") as string, {
-      credentials: "include",
-    });
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10000);
 
-    if (unauthorizedBehavior === "returnNull" && res.status === 401) {
-      return null;
+    try {
+      const res = await fetch(queryKey.join("/") as string, {
+        credentials: "include",
+        signal: controller.signal,
+      });
+
+      if (unauthorizedBehavior === "returnNull" && res.status === 401) {
+        return null as any;
+      }
+
+      await throwIfResNotOk(res);
+      return await res.json();
+    } finally {
+      clearTimeout(timeoutId);
     }
-
-    await throwIfResNotOk(res);
-    return await res.json();
   };
 
 export const queryClient = new QueryClient({

@@ -15,7 +15,22 @@ export default function Admin() {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    checkAuth();
+    let cancelled = false;
+    const t = setTimeout(() => {
+      if (!cancelled) {
+        setIsLoading(false);
+        setIsAuthenticated(false);
+      }
+    }, 10000); // 10s max loading
+
+    checkAuth().finally(() => {
+      if (!cancelled) clearTimeout(t);
+    });
+
+    return () => {
+      cancelled = true;
+      clearTimeout(t);
+    };
   }, []);
 
   const checkAuth = async () => {
