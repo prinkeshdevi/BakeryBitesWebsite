@@ -36,6 +36,10 @@ export default defineConfig(async () => {
     build: {
       outDir: path.resolve(__dirname, "dist/public"),
       emptyOutDir: true,
+      rollupOptions: {
+        // In case any component still references this at build time
+        external: ["@radix-ui/react-tooltip"],
+      },
     },
     server: {
       fs: {
