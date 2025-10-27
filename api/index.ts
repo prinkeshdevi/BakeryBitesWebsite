@@ -1,11 +1,11 @@
 import express from "express";
 import session from "express-session";
 import type { VercelRequest, VercelResponse } from "@vercel/node";
+import path from "path";
 import { registerRoutes } from "../server/routes";
 
 // Minimal Express app suitable for Vercel Serverless Functions.
-// No Vite dev middleware or custom static serving here.
-// Static files are handled by Vercel (see vercel.json).
+// No Vite dev middleware here. Static files are handled by Vercel (see vercel.json).
 
 declare module "express-session" {
   interface SessionData {
@@ -42,6 +42,10 @@ app.use(
   })
 );
 app.use(express.urlencoded({ extended: false }));
+
+// Serve uploads via the serverless function (Vercel’s FS is read-only except /tmp)
+const baseUploadDir = process.env.VERCEL ? "/tmp" : process.cwd();
+app.use("/uploads", express.static(path.join(baseUploadDir, "uploads")));
 
 // Basic health check for debugging
 app.get("/api/health", (_req, res) => {
