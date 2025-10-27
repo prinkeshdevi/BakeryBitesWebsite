@@ -78,6 +78,18 @@ export async function bootstrapDb() {
     );
   `);
 
+  await db.execute(sql`
+    CREATE TABLE IF NOT EXISTS uploads (
+      id varchar PRIMARY KEY,
+      filename text NOT NULL,
+      url text NOT NULL,
+      mimetype text NOT NULL,
+      size integer NOT NULL,
+      is_video boolean NOT NULL DEFAULT false,
+      created_at timestamp DEFAULT now()
+    );
+  `);
+
   // Seed a default admin to guarantee access (id can be any stable string)
   await db.execute(sql`
     INSERT INTO admins (id, username, password)

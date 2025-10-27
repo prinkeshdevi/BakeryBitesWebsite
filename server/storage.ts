@@ -9,11 +9,14 @@ import {
   type InsertCustomOrder,
   type Contact,
   type InsertContact,
+  type Upload,
+  type InsertUpload,
   admins,
   products as productsTable,
   slideshowImages as slideshowImagesTable,
   customOrders as customOrdersTable,
   contacts as contactsTable,
+  uploads as uploadsTable,
 } from "../shared/schema";
 import { randomUUID } from "crypto";
 import { getDb, bootstrapDb } from "./db";
@@ -46,6 +49,11 @@ export interface IStorage {
   ): Promise<Product | undefined>;
   deleteProduct(id: string): Promise<boolean>;
 
+  // Uploads methods
+  getAllUploads(): Promise<Upload[]>;
+  createUpload(upload: InsertUpload): Promise<Upload>;
+  deleteUploadByFilename(filename: string): Promise<boolean>;
+
   // Custom Order methods
   getAllCustomOrders(): Promise<CustomOrder[]>;
   getCustomOrder(id: string): Promise<CustomOrder | undefined>;
@@ -66,6 +74,7 @@ export class MemStorage implements IStorage {
   private products: Map<string, Product>;
   private customOrders: Map<string, CustomOrder>;
   private contacts: Map<string, Contact>;
+  private uploads: Map<string, Upload>;
   private persistPath: string | null;
 
   constructor() {
@@ -74,6 +83,7 @@ export class MemStorage implements IStorage {
     this.products = new Map();
     this.customOrders = new Map();
     this.contacts = new Map();
+    this.uploads = new Map();
     // Persist to JSON when running without DATABASE_URL (use /tmp on Vercel)
     const base = process.env.VERCEL ? "/tmp" : process.cwd();
     this.persistPath = `${base}/uploads_state.json`;
@@ -106,6 +116,7 @@ export class MemStorage implements IStorage {
         if (data.products) for (const p of data.products as Product[]) this.products.set(p.id, p);
         if (data.customOrders) for (const o of data.customOrders as CustomOrder[]) this.customOrders.set(o.id, o);
         if (data.contacts) for (const c of data.contacts as Contact[]) this.contacts.set(c.id, c);
+        if (data.uploads) for (const u of data.uploads as Upload[]) this.uploads.set(u.id, u);
       }
     } catch {
       // ignore
@@ -122,6 +133,7 @@ export class MemStorage implements IStorage {
         products: Array.from(this.products.values()),
         customOrders: Array.from(this.customOrders.values()),
         contacts: Array.from(this.contacts.values()),
+        uploads: Array.from(this.uploads.values()),
       };
       fs.writeFileSync(this.persistPath, JSON.stringify(payload));
     } catch {
@@ -376,6 +388,37 @@ export class MemStorage implements IStorage {
 
   async deleteProduct(id: string): Promise<boolean> {
     return this.products.delete(id);
+  }
+
+  // Uploads
+  async getAllUploads(): Promise<Upload[]> {
+    return Array.from(this.uploads.values()).sort((a, b) => (b.createdAt?.getTime() || 0) - (a.createdAt?.getTime() || 0));
+  }
+  async createUpload(insert: InsertUpload): Promise<Upload> {
+    const id = randomUUID();
+    const row: Upload = {
+      id,
+      filename: insert.filename,
+      url: insert.url,
+      mimetype: insert.mimetype,
+      size: insert.size,
+      isVideo: insert.isVideo ?? false,
+      createdAt: new Date(),
+    };
+    this.uploads.set(id, row);
+    this.saveToDisk();
+    return row;
+  }
+  async deleteUploadByFilename(filename: string): Promise<boolean> {
+    let deleted = false;
+    for (const [id, u] of this.uploads) {
+      if (u.filename === filename) {
+        this.uploads.delete(id);
+        deleted = true;
+      }
+    }
+    if (deleted) this.saveToDisk();
+    return deleted;
   }
 
   // Custom Order methods

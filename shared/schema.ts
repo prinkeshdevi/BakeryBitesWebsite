@@ -94,3 +94,22 @@ export const insertContactSchema = createInsertSchema(contacts).omit({
 
 export type InsertContact = z.infer<typeof insertContactSchema>;
 export type Contact = typeof contacts.$inferSelect;
+
+// Uploads (images/videos and any other files)
+export const uploads = pgTable("uploads", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  filename: text("filename").notNull(),
+  url: text("url").notNull(),
+  mimetype: text("mimetype").notNull(),
+  size: integer("size").notNull(),
+  isVideo: boolean("is_video").notNull().default(false),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertUploadSchema = createInsertSchema(uploads).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertUpload = z.infer<typeof insertUploadSchema>;
+export type Upload = typeof uploads.$inferSelect;
