@@ -102,7 +102,7 @@ export default function ProductManager() {
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
               <ImageUpload
                 onUpload={(file) => uploadImageMutation.mutateAsync(file)}
-                accept="image/*"
+                accept="image/*,video/*"
               />
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

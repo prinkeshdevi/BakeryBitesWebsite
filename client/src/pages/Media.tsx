@@ -4,6 +4,7 @@ import AdminLogin from "@/components/admin/AdminLogin";
 import SlideshowManager from "@/components/admin/SlideshowManager";
 import ProductManager from "@/components/admin/ProductManager";
 import OrdersAndContacts from "@/components/admin/OrdersAndContacts";
+import UploadsManager from "@/components/admin/UploadsManager";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { LogOut, Home, Images } from "lucide-react";
@@ -102,12 +103,15 @@ export default function Media() {
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <Tabs defaultValue="slideshow" className="w-full">
-          <TabsList className="grid w-full grid-cols-3 mb-8">
+          <TabsList className="grid w-full grid-cols-4 mb-8">
             <TabsTrigger value="slideshow" data-testid="tab-slideshow">
               Slideshows
             </TabsTrigger>
             <TabsTrigger value="products" data-testid="tab-products">
               Photos &amp; Products
+            </TabsTrigger>
+            <TabsTrigger value="uploads" data-testid="tab-uploads">
+              Uploads
             </TabsTrigger>
             <TabsTrigger value="inquiries" data-testid="tab-inquiries">
               Orders &amp; Contacts
@@ -120,6 +124,10 @@ export default function Media() {
 
           <TabsContent value="products">
             <ProductManager />
+          </TabsContent>
+
+          <TabsContent value="uploads">
+            <UploadsManager />
           </TabsContent>
 
           <TabsContent value="inquiries">

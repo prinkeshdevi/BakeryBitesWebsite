@@ -3,7 +3,7 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import multer = require("multer");
 import path from "path";
-import { existsSync, mkdirSync } from "fs";
+import { existsSync, mkdirSync, readdirSync, statSync, unlinkSync } from "fs";
 import {
   insertSlideshowImageSchema,
   insertProductSchema,
@@ -338,7 +338,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Contact Routes
-  app.get("/api/contacts", requireAuth, async (req, res) => {
+  app.get("/api/contacts", requireAuth, async (_req, res) => {
     try {
       const contacts = await storage.getAllContacts();
       res.json(contacts);
@@ -354,6 +354,48 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(contact);
     } catch (error: any) {
       res.status(400).json({ error: error.message || "Invalid contact data" });
+    }
+  });
+
+  // Uploads listing and deletion
+  app.get("/api/uploads", requireAuth, (_req, res) => {
+    try {
+      if (!existsSync(uploadDir)) {
+        return res.json([]);
+      }
+      const files = readdirSync(uploadDir);
+      const list = files.map((name) => {
+        const full = path.join(uploadDir, name);
+        const st = statSync(full);
+        const lower = name.toLowerCase();
+        const isVideo = /\.(mp4|mov|avi|webm|mkv)$/.test(lower);
+        return {
+          name,
+          size: st.size,
+          modifiedAt: st.mtimeMs,
+          url: `/uploads/${name}`,
+          isVideo,
+        };
+      }).sort((a, b) => b.modifiedAt - a.modifiedAt);
+      res.json(list);
+    } catch (e) {
+      res.status(500).json({ error: "Failed to list uploads" });
+    }
+  });
+
+  app.delete("/api/uploads/:name", requireAuth, (req, res) => {
+    try {
+      const name = req.params.name;
+      // Prevent path traversal
+      const safeName = path.basename(name);
+      const full = path.join(uploadDir, safeName);
+      if (!existsSync(full)) {
+        return res.status(404).json({ error: "File not found" });
+      }
+      unlinkSync(full);
+      res.json({ message: "Deleted" });
+    } catch (e) {
+      res.status(500).json({ error: "Failed to delete file" });
     }
   });
 
