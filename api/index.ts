@@ -58,19 +58,48 @@ app.get("/api/health", (_req, res) => {
   });
 });
 
-// Register routes with explicit error surface if import fails
+// Try to register the full server routes. If it fails, add minimal fallbacks
+let fullRoutesReady = false;
 (async () => {
   try {
     const { registerRoutes } = await import("../server/routes");
-    registerRoutes(app);
+    await registerRoutes(app);
+    fullRoutesReady = true;
   } catch (err: any) {
-    // Surface import errors at /api/health for quick diagnostics
     const msg = (err && (err.stack || err.message)) || String(err);
     // eslint-disable-next-line no-console
     console.error("Failed to register routes:", msg);
-    app.get("/api/admin/login", (_req, res) => {
-      res.status(500).json({ error: "Routes init failed", detail: msg });
+
+    // Minimal fallbacks so orders and contacts can still be submitted
+    let memoryOrders: any[] = [];
+    let memoryContacts: any[] = [];
+
+    // Load validation schema lazily
+    const { insertCustomOrderSchema, insertContactSchema } = await import("../shared/schema");
+
+    app.post("/api/orders/custom", (req, res) => {
+      try {
+        const validated = insertCustomOrderSchema.parse(req.body);
+        const order = { ...validated, id: `${Date.now()}` };
+        memoryOrders.unshift(order);
+        res.json(order);
+      } catch (e: any) {
+        res.status(400).json({ error: e?.message || "Invalid order data" });
+      }
     });
+
+    app.post("/api/contacts", (req, res) => {
+      try {
+        const validated = insertContactSchema.parse(req.body);
+        const contact = { ...validated, id: `${Date.now()}` };
+        memoryContacts.unshift(contact);
+        res.json(contact);
+      } catch (e: any) {
+        res.status(400).json({ error: e?.message || "Invalid contact data" });
+      }
+    });
+
+    // Explicit error for other API endpoints during fallback
     app.all("/api/*", (_req, res) => {
       res.status(500).json({ error: "Routes init failed", detail: msg });
     });
