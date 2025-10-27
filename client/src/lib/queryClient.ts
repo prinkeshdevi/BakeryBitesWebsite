@@ -12,10 +12,13 @@ export async function apiRequest(
   url: string,
   data?: unknown | undefined,
 ): Promise<Response> {
+  const upper = method.toUpperCase();
+  const hasBody = data !== undefined && upper !== "GET" && upper !== "HEAD";
+
   const res = await fetch(url, {
-    method,
-    headers: data ? { "Content-Type": "application/json" } : {},
-    body: data ? JSON.stringify(data) : undefined,
+    method: upper,
+    headers: hasBody ? { "Content-Type": "application/json" } : {},
+    body: hasBody ? JSON.stringify(data) : undefined,
     credentials: "include",
   });
 

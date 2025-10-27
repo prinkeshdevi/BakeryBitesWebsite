@@ -20,7 +20,7 @@ export default function Admin() {
 
   const checkAuth = async () => {
     try {
-      await apiRequest("GET", "/api/admin/check", {});
+      await apiRequest("GET", "/api/admin/check");
       setIsAuthenticated(true);
     } catch {
       setIsAuthenticated(false);
