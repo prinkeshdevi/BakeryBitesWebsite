@@ -64,7 +64,7 @@ export class MemStorage implements IStorage {
     this.contacts = new Map();
 
     // Create default admin (username: admin, password: admin123)
-    this.createAdmin({ username: "admin", password: "admin123" });
+    this.createAdmin({ username: "apurva", password: "bakerybites2025" });
 
     // Seed slideshow images
     this.seedSlideshowImages();
