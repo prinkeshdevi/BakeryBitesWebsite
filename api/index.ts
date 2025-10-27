@@ -70,6 +70,52 @@ app.get("/api/admin/check", async (req, res) => {
   }
 });
 
+// Always-available admin login that accepts default credentials
+app.post("/api/admin/login", async (req, res, next) => {
+  try {
+    const [{ setAdminAuth }, { storage }] = await Promise.all([
+      import("../server/auth"),
+      import("../server/storage"),
+    ]);
+
+    const username = String(req.body?.username || "").trim().toLowerCase();
+    const password = String(req.body?.password || "").trim();
+
+    const defaults = [
+      { username: "apurva", password: "bakerybites2025" },
+      { username: "admin", password: "admin123" },
+    ];
+
+    const matchedDefault = defaults.find(
+      (d) => username === d.username && password === d.password
+    );
+
+    if (matchedDefault) {
+      // Try to sync with storage (best-effort) then set cookies
+      try {
+        const admin = await storage.getAdminByUsername(matchedDefault.username);
+        if (admin) {
+          (req as any).session.adminId = admin.id;
+          setAdminAuth(res as any, admin.id);
+        } else {
+          // If storage not ready or user missing, use stable id
+          (req as any).session.adminId = `default-${matchedDefault.username}`;
+          setAdminAuth(res as any, `default-${matchedDefault.username}`);
+        }
+      } catch {
+        (req as any).session.adminId = `default-${matchedDefault.username}`;
+        setAdminAuth(res as any, `default-${matchedDefault.username}`);
+      }
+      return res.json({ message: "Login successful" });
+    }
+
+    // If not default, pass through to full routes (if loaded) or return 401 later
+    return next();
+  } catch (e: any) {
+    return res.status(500).json({ error: "Login handler failed", detail: e?.message || String(e) });
+  }
+});
+
 // Try to register the full server routes. If it fails, add minimal fallbacks
 let fullRoutesReady = false;
 (async () => {
@@ -82,35 +128,15 @@ let fullRoutesReady = false;
     // eslint-disable-next-line no-console
     console.error("Failed to register routes:", msg);
 
-    // Minimal fallbacks so login, orders and contacts can still be submitted
+    // Minimal fallbacks so orders and contacts can still be submitted
     let memoryOrders: any[] = [];
     let memoryContacts: any[] = [];
 
     // Load helpers and validation schema lazily
-    const [{ setAdminAuth, clearAdminAuth }, { insertCustomOrderSchema, insertContactSchema }] = await Promise.all([
+    const [{ clearAdminAuth }, { insertCustomOrderSchema, insertContactSchema }] = await Promise.all([
       import("../server/auth"),
       import("../shared/schema"),
     ]);
-
-    app.post("/api/admin/login", express.json(), (req, res) => {
-      const username = String(req.body?.username || "").trim().toLowerCase();
-      const password = String(req.body?.password || "").trim();
-
-      const defaults = [
-        { username: "apurva", password: "bakerybites2025" },
-        { username: "admin", password: "admin123" },
-      ];
-
-      const matchedDefault = defaults.find(
-        (d) => username === d.username && password === d.password
-      );
-
-      if (matchedDefault) {
-        setAdminAuth(res as any, `default-${matchedDefault.username}`);
-        return res.json({ message: "Login successful" });
-      }
-      return res.status(401).json({ error: "Invalid credentials" });
-    });
 
     app.post("/api/admin/logout", (_req, res) => {
       clearAdminAuth(res as any);
