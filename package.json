@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "cross-env NODE_ENV=development tsx server/index.ts",
     "build:web": "vite build && shx mkdir -p dist/public/assets && shx cp -r attached_assets/* dist/public/assets",
-    "build:server": "esbuild server/index.ts --platform=node --packages=external --bundle --format=esm --outdir=dist",
+    "build:server": "esbuild server/index.ts --platform=node --bundle --format=esm --outdir=dist --target=node20 --external:vite --external:@vitejs/plugin-react --external:@replit/vite-plugin-runtime-error-modal --external:@replit/vite-plugin-cartographer --external:@replit/vite-plugin-dev-banner",
     "build": "npm run build:web && npm run build:server",
     "start": "cross-env NODE_ENV=production node dist/index.js",
     "check": "tsc",
