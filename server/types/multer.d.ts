@@ -4,7 +4,7 @@
 import type { Request } from "express";
 
 declare module "multer" {
-  namespace multer {
+  namespace MulterNS {
     interface Multer {
       single(fieldname: string): any;
     }
@@ -34,15 +34,22 @@ declare module "multer" {
     }): StorageEngine;
   }
 
+  // Default export (for ESM default import)
   function multer(opts: {
-    storage: multer.StorageEngine;
+    storage: MulterNS.StorageEngine;
     limits?: { fileSize?: number };
-    fileFilter?: (req: Request, file: multer.MulterFile, cb: multer.FileFilterCallback) => void;
-  }): multer.Multer;
+    fileFilter?: (req: Request, file: MulterNS.MulterFile, cb: MulterNS.FileFilterCallback) => void;
+  }): MulterNS.Multer;
+  export default multer;
 
-  namespace multer {
-    export { Multer, StorageEngine, MulterFile, FileFilterCallback, diskStorage };
+  // Named export for diskStorage
+  export const diskStorage: typeof MulterNS.diskStorage;
+
+  // Re-export types within a namespace-like object
+  export namespace multer {
+    export import Multer = MulterNS.Multer;
+    export import StorageEngine = MulterNS.StorageEngine;
+    export import MulterFile = MulterNS.MulterFile;
+    export import FileFilterCallback = MulterNS.FileFilterCallback;
   }
-
-  export = multer;
 }

@@ -395,11 +395,19 @@ export class MemStorage implements IStorage {
   ): Promise<CustomOrder> {
     const id = randomUUID();
     const order: CustomOrder = {
-      ...insertOrder,
       id,
+      cakeType: insertOrder.cakeType,
+      size: insertOrder.size,
+      flavor: insertOrder.flavor,
+      customMessage: insertOrder.customMessage ?? null,
+      deliveryDate: insertOrder.deliveryDate,
+      customerName: insertOrder.customerName,
+      phone: insertOrder.phone,
+      email: insertOrder.email,
       createdAt: new Date(),
     };
     this.customOrders.set(id, order);
+    this.saveToDisk();
     return order;
   }
 
