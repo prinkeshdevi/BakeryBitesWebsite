@@ -44,6 +44,16 @@ app.use(express.json({
 }));
 app.use(express.urlencoded({ extended: false }));
 
+// Simple health check to debug availability
+app.get("/health", (_req, res) => {
+  res.status(200).json({
+    status: "ok",
+    env: process.env.NODE_ENV || "development",
+    cwd: process.cwd(),
+    time: new Date().toISOString(),
+  });
+});
+
 app.use((req, res, next) => {
   const start = Date.now();
   const path = req.path;
@@ -82,16 +92,32 @@ app.use((req, res, next) => {
     const message = err.message || "Internal Server Error";
 
     res.status(status).json({ message });
-    throw err;
+    // Log full stack for debugging
+    console.error("Unhandled error:", err);
   });
 
   // importantly only setup vite in development and after
   // setting up all the other routes so the catch-all route
   // doesn't interfere with the other routes
-  if (app.get("env") === "development") {
-    await setupVite(app, server);
+  const env = app.get("env");
+  log(`starting server in ${env} mode`);
+
+  if (env === "development") {
+    try {
+      await setupVite(app, server);
+      log("vite dev middleware attached");
+    } catch (e) {
+      console.error("Failed to setup Vite middleware:", e);
+      throw e;
+    }
   } else {
-    serveStatic(app);
+    try {
+      serveStatic(app);
+      log("serving static assets from dist/public");
+    } catch (e) {
+      console.error("Failed to serve static assets:", e);
+      throw e;
+    }
   }
 
   // ALWAYS serve the app on the port specified in the environment variable PORT

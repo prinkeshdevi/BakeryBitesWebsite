@@ -1,16 +1,10 @@
 import express, { type Express } from "express";
 import fs from "fs";
 import path from "path";
-import { createServer as createViteServer, createLogger } from "vite";
-import react from "@vitejs/plugin-react";
-import runtimeErrorOverlay from "@replit/vite-plugin-runtime-error-modal";
-import { type Server } from "http";
-import { nanoid } from "nanoid";
+
 import { fileURLToPath } from "url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-
-const viteLogger = createLogger();
 
 export function log(message: string, source = "express") {
   const formattedTime = new Date().toLocaleTimeString("en-US", {
@@ -24,17 +18,22 @@ export function log(message: string, source = "express") {
 }
 
 export async function setupVite(app: Express, server: Server) {
+  // Import Vite only in development to avoid requiring it in production
+  const { createServer: createViteServer } = await import("vite");
+
   const serverOptions = {
     middlewareMode: true,
     hmr: { server },
     allowedHosts: true as const,
   };
 
-  // Build plugins list dynamically to avoid importing Vite config in Node runtime
-  const plugins = [
-    react(),
-    runtimeErrorOverlay(),
-  ];
+  // Dynamically import dev-only plugins so production doesn't require them
+  const [{ default: react }, { default: runtimeErrorOverlay }] = await Promise.all([
+    import("@vitejs/plugin-react"),
+    import("@replit/vite-plugin-runtime-error-modal"),
+  ]);
+
+  const plugins = [react(), runtimeErrorOverlay()];
 
   if (process.env.NODE_ENV !== "production" && process.env.REPL_ID !== undefined) {
     const { cartographer } = await import("@replit/vite-plugin-cartographer");
@@ -44,13 +43,6 @@ export async function setupVite(app: Express, server: Server) {
 
   const vite = await createViteServer({
     configFile: false,
-    customLogger: {
-      ...viteLogger,
-      error: (msg, options) => {
-        viteLogger.error(msg, options);
-        process.exit(1);
-      },
-    },
     server: serverOptions,
     appType: "custom",
     root: path.resolve(__dirname, "..", "client"),
@@ -62,7 +54,7 @@ export async function setupVite(app: Express, server: Server) {
         "@assets": path.resolve(__dirname, "..", "attached_assets"),
       },
     },
-  });
+
 
   app.use(vite.middlewares);
   app.use("*", async (req, res, next) => {
@@ -80,12 +72,14 @@ export async function setupVite(app: Express, server: Server) {
       let template = await fs.promises.readFile(clientTemplate, "utf-8");
       template = template.replace(
         `src="/src/main.tsx"`,
-        `src="/src/main.tsx?v=${nanoid()}"`,
+        `src="/src/main.tsx?v=${Date.now()}"`,
       );
       const page = await vite.transformIndexHtml(url, template);
       res.status(200).set({ "Content-Type": "text/html" }).end(page);
     } catch (e) {
-      vite.ssrFixStacktrace(e as Error);
+      // Vite provides better stack traces in dev
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (vite as any).ssrFixStacktrace?.(e as Error);
       next(e);
     }
   });
@@ -106,5 +100,4 @@ export function serveStatic(app: Express) {
   app.use("*", (_req, res) => {
     res.sendFile(path.resolve(distPath, "index.html"));
   });
-});
 }
