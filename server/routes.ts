@@ -323,6 +323,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const file = mreq.file;
+      const cloudEnabled = isCloudinaryEnabled();
       let url = `/uploads/${file.filename}`;
       let publicId: string | null = null;
       let isVideo =
@@ -330,7 +331,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         /^video\\//i.test(String(file.mimetype || ""));
 
       // If Cloudinary is configured, upload the saved local file to Cloudinary
-      if (isCloudinaryEnabled()) {
+      let cloudError: any = null;
+      if (cloudEnabled) {
         try {
           const localPath = path.join(uploadDir, file.filename);
           const uploaded = await uploadLocalFileToCloudinary(localPath, {
@@ -339,7 +341,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           url = uploaded.url;
           publicId = uploaded.publicId;
           isVideo = uploaded.resourceType === "video";
-        } catch (e) {
+        } catch (e: any) {
+          cloudError = e?.message || String(e);
           // Cloud upload failed; continue with local url
         }
       }
@@ -358,7 +361,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // ignore metadata failures
       }
 
-      res.json({ url });
+      const debug = String(process.env.CLOUDINARY_DEBUG || "").toLowerCase() === "true";
+      const payload: any = {
+        url,
+        source: publicId ? "cloudinary" : "local",
+        cloudinary: { enabled: cloudEnabled, publicId: publicId || undefined },
+      };
+      if (debug && cloudError) {
+        payload.cloudinary.error = cloudError;
+      }
+
+      res.json(payload);
     } catch (error) {
       res.status(500).json({ error: "Failed to upload file" });
     }
