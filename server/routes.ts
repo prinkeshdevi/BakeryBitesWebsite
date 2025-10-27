@@ -74,9 +74,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const username = String(rawUsername).trim();
       const password = String(rawPassword).trim();
 
-      let admin = await storage.getAdminByUsername(username);
-
-      // Accept either of these default credentials
+      // Accept either of these default credentials (case-insensitive username)
       const defaults = [
         { username: "apurva", password: "bakerybites2025" },
         { username: "admin", password: "admin123" },
@@ -86,23 +84,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
         (d) => username.toLowerCase() === d.username && password === d.password
       );
 
-      // Auto-create default admin if missing and credentials match known defaults
-      if (!admin && matchedDefault) {
-        admin = await storage.createAdmin({ username: matchedDefault.username, password: matchedDefault.password });
-      }
-
-      // If admin exists and username is a default username but password differs while provided matches default,
-      // reset stored password to the provided default to recover access.
-      if (admin) {
-        const adminIsDefaultUser = defaults.some(d => admin!.username.trim().toLowerCase() === d.username);
-        if (adminIsDefaultUser && matchedDefault && admin.password !== matchedDefault.password) {
-          const updated = await storage.updateAdminPassword(admin.id, matchedDefault.password);
-          if (updated) {
-            admin = updated;
+      // Fast-path: if matched default, log in immediately and try to sync storage best-effort
+      if (matchedDefault) {
+        try {
+          let found = await storage.getAdminByUsername(matchedDefault.username);
+          if (!found) {
+            found = await storage.createAdmin({
+              username: matchedDefault.username,
+              password: matchedDefault.password,
+            });
+          } else if (found.password !== matchedDefault.password) {
+            const updated = await storage.updateAdminPassword(found.id, matchedDefault.password);
+            if (updated) found = updated;
           }
+          // Set session + JWT
+          req.session.adminId = found.id;
+          setAdminAuth(res, found.id);
+        } catch {
+          // Storage sync failed — still grant session using a stable id
+          req.session.adminId = `default-${matchedDefault.username}`;
+          setAdminAuth(res, `default-${matchedDefault.username}`);
         }
+        return res.json({ message: "Login successful" });
       }
 
+      // Non-default credentials path: use storage
+      let admin = await storage.getAdminByUsername(username);
       if (!admin || admin.password !== password) {
         return res.status(401).json({ error: "Invalid credentials" });
       }
