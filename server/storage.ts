@@ -211,8 +211,9 @@ export class MemStorage implements IStorage {
 
   // Admin methods
   async getAdminByUsername(username: string): Promise<Admin | undefined> {
+    const needle = username.trim().toLowerCase();
     return Array.from(this.admins.values()).find(
-      (admin) => admin.username === username
+      (admin) => admin.username.trim().toLowerCase() === needle
     );
   }
 

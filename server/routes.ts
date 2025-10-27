@@ -60,11 +60,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Admin Authentication Routes
   app.post("/api/admin/login", async (req, res) => {
     try {
-      const { username, password } = req.body;
+      const rawUsername = req.body?.username;
+      const rawPassword = req.body?.password;
 
-      if (!username || !password) {
+      if (!rawUsername || !rawPassword) {
         return res.status(400).json({ error: "Username and password required" });
       }
+
+      const username = String(rawUsername).trim();
+      const password = String(rawPassword).trim();
 
       const admin = await storage.getAdminByUsername(username);
 
