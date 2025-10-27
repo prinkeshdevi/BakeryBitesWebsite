@@ -609,6 +609,12 @@ export class PgStorage implements IStorage {
     const [row] = await db.insert(uploadsTable).values({ id, ...insert }).returning();
     return row!;
   }
+  async getUploadByFilename(filename: string): Promise<Upload | undefined> {
+    await this.ensureReady();
+    const db = getDb()!;
+    const [row] = await db.select().from(uploadsTable).where(eq(uploadsTable.filename, filename)).limit(1);
+    return row;
+  }
   async deleteUploadByFilename(filename: string): Promise<boolean> {
     await this.ensureReady();
     const db = getDb()!;

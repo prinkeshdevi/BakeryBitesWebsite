@@ -4,6 +4,7 @@ import { storage } from "./storage";
 import multer from "multer";
 import path from "path";
 import { existsSync, mkdirSync, readdirSync, statSync, unlinkSync } from "fs";
+import { isCloudinaryEnabled, uploadLocalFileToCloudinary, destroyCloudinary } from "./cloudinary";
 import {
   insertSlideshowImageSchema,
   insertProductSchema,
@@ -312,25 +313,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const file = mreq.file;
-      const imageUrl = `/uploads/${file.filename}`;
-      const isVideo =
+      let url = `/uploads/${file.filename}`;
+      let publicId: string | null = null;
+      let isVideo =
         /\.(mp4|mov|avi|webm|mkv)$/i.test((file.originalname || "").toLowerCase()) ||
         /^video\\//i.test(String(file.mimetype || ""));
+
+      // If Cloudinary is configured, upload the saved local file to Cloudinary
+      if (isCloudinaryEnabled()) {
+        try {
+          const localPath = path.join(uploadDir, file.filename);
+          const uploaded = await uploadLocalFileToCloudinary(localPath, {
+            folder: process.env.CLOUDINARY_UPLOAD_FOLDER || "bakery-bites",
+          });
+          url = uploaded.url;
+          publicId = uploaded.publicId;
+          isVideo = uploaded.resourceType === "video";
+        } catch (e) {
+          // Cloud upload failed; continue with local url
+        }
+      }
 
       // Persist upload metadata (DB if available, otherwise memory)
       try {
         await storage.createUpload({
           filename: file.filename,
-          url: imageUrl,
+          url,
           mimetype: String(file.mimetype || "application/octet-stream"),
           size: Number(file.size || 0),
           isVideo,
+          publicId: publicId || undefined,
         } as any);
       } catch {
         // ignore metadata failures
       }
 
-      res.json({ url: imageUrl });
+      res.json({ url });
     } catch (error) {
       res.status(500).json({ error: "Failed to upload file" });
     }
@@ -422,6 +440,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const name = req.params.name;
       // Prevent path traversal
       const safeName = path.basename(name);
+
+      // Try Cloudinary delete if configured and record exists
+      if (isCloudinaryEnabled()) {
+        try {
+          const rec = await storage.getUploadByFilename(safeName);
+          if (rec && (rec as any).publicId) {
+            await destroyCloudinary((rec as any).publicId as string);
+          }
+        } catch {}
+      }
+
+      // Delete local file as best-effort
       const full = path.join(uploadDir, safeName);
       if (existsSync(full)) {
         unlinkSync(full);
