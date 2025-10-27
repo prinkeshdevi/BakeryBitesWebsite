@@ -1,7 +1,7 @@
 import express, { type Express } from "express";
 import fs from "fs";
 import path from "path";
-
+import { type Server } from "http";
 import { fileURLToPath } from "url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -54,7 +54,7 @@ export async function setupVite(app: Express, server: Server) {
         "@assets": path.resolve(__dirname, "..", "attached_assets"),
       },
     },
-
+  });
 
   app.use(vite.middlewares);
   app.use("*", async (req, res, next) => {
