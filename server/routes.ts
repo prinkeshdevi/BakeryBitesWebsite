@@ -1,7 +1,7 @@
 import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import multer from "multer";
+import multer = require("multer");
 import path from "path";
 import { existsSync, mkdirSync } from "fs";
 import {
@@ -21,10 +21,10 @@ if (!existsSync(uploadDir)) {
 }
 
 const multerStorage = multer.diskStorage({
-  destination: (req: Request, file: Express.Multer.File, cb: (error: any, destination: string) => void) => {
+  destination: (req: Request, file: multer.MulterFile, cb: (error: any, destination: string) => void) => {
     cb(null, uploadDir);
   },
-  filename: (req: Request, file: Express.Multer.File, cb: (error: any, filename: string) => void) => {
+  filename: (req: Request, file: multer.MulterFile, cb: (error: any, filename: string) => void) => {
     const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
     cb(null, uniqueSuffix + path.extname(file.originalname));
   },
@@ -33,7 +33,7 @@ const multerStorage = multer.diskStorage({
 const upload = multer({
   storage: multerStorage,
   limits: { fileSize: 10 * 1024 * 1024 }, // 10MB
-  fileFilter: (req: Request, file: Express.Multer.File, cb: multer.FileFilterCallback) => {
+  fileFilter: (req: Request, file: multer.MulterFile, cb: multer.FileFilterCallback) => {
     const allowedTypes = /jpeg|jpg|png|gif|mp4|mov|avi/;
     const extname = allowedTypes.test(
       path.extname(file.originalname).toLowerCase()
@@ -306,12 +306,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // File Upload Route (for product images)
   app.post("/api/upload", requireAuth, upload.single("image"), (req, res) => {
     try {
-      const mreq = req as Request & { file?: Express.Multer.File };
-      if (!mreq.file) {
+      if (!req.file) {
         return res.status(400).json({ error: "No file uploaded" });
       }
 
-      const imageUrl = `/uploads/${mreq.file.filename}`;
+      const imageUrl = `/uploads/${req.file.filename}`;
       res.json({ url: imageUrl });
     } catch (error) {
       res.status(500).json({ error: "Failed to upload file" });
