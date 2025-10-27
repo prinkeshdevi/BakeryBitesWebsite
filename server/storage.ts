@@ -9,8 +9,15 @@ import {
   type InsertCustomOrder,
   type Contact,
   type InsertContact,
+  admins,
+  products as productsTable,
+  slideshowImages as slideshowImagesTable,
+  customOrders as customOrdersTable,
+  contacts as contactsTable,
 } from "../shared/schema";
 import { randomUUID } from "crypto";
+import { getDb, bootstrapDb } from "./db";
+import { eq, and, desc, sql } from "drizzle-orm";
 
 export interface IStorage {
   // Admin methods
@@ -50,6 +57,9 @@ export interface IStorage {
   createContact(contact: InsertContact): Promise<Contact>;
 }
 
+/**
+ * In-memory storage (fallback for local dev without DB)
+ */
 export class MemStorage implements IStorage {
   private admins: Map<string, Admin>;
   private slideshowImages: Map<string, SlideshowImage>;
@@ -364,4 +374,156 @@ export class MemStorage implements IStorage {
   }
 }
 
-export const storage = new MemStorage();
+/**
+ * Postgres-backed storage (production)
+ */
+export class PgStorage implements IStorage {
+  private ready: Promise<void>;
+  constructor() {
+    this.ready = bootstrapDb();
+  }
+  private async ensureReady() {
+    await this.ready;
+  }
+  async getAdminByUsername(username: string): Promise<Admin | undefined> {
+    await this.ensureReady();
+    const db = getDb()!;
+    const needle = username.trim().toLowerCase();
+    const rows = await db
+      .select()
+      .from(admins)
+      .where(sql`lower(${admins.username}) = ${needle}`)
+      .limit(1);
+    return rows[0];
+  }
+  async createAdmin(insertAdmin: InsertAdmin): Promise<Admin> {
+    await this.ensureReady();
+    const db = getDb()!;
+    const id = randomUUID();
+    const [row] = await db
+      .insert(admins)
+      .values({ id, ...insertAdmin })
+      .returning();
+    return row!;
+  }
+  async updateAdminPassword(id: string, password: string): Promise<Admin | undefined> {
+    await this.ensureReady();
+    const db = getDb()!;
+    const [row] = await db.update(admins).set({ password }).where(eq(admins.id, id)).returning();
+    return row;
+  }
+
+  async getAllSlideshowImages(): Promise<SlideshowImage[]> {
+    await this.ensureReady();
+    const db = getDb()!;
+    const rows = await db.select().from(slideshowImagesTable).orderBy(slideshowImagesTable.order);
+    return rows;
+  }
+  async getSlideshowImage(id: string): Promise<SlideshowImage | undefined> {
+    await this.ensureReady();
+    const db = getDb()!;
+    const [row] = await db.select().from(slideshowImagesTable).where(eq(slideshowImagesTable.id, id)).limit(1);
+    return row;
+  }
+  async createSlideshowImage(image: InsertSlideshowImage): Promise<SlideshowImage> {
+    await this.ensureReady();
+    const db = getDb()!;
+    const id = randomUUID();
+    const [row] = await db.insert(slideshowImagesTable).values({ id, ...image }).returning();
+    return row!;
+  }
+  async updateSlideshowImage(id: string, data: Partial<InsertSlideshowImage>): Promise<SlideshowImage | undefined> {
+    await this.ensureReady();
+    const db = getDb()!;
+    const [row] = await db.update(slideshowImagesTable).set(data).where(eq(slideshowImagesTable.id, id)).returning();
+    return row;
+  }
+  async deleteSlideshowImage(id: string): Promise<boolean> {
+    await this.ensureReady();
+    const db = getDb()!;
+    const res = await db.delete(slideshowImagesTable).where(eq(slideshowImagesTable.id, id));
+    // drizzle neon-http returns { rowCount?: number } only on pg driver; here assume success if no error
+    return true;
+  }
+
+  async getAllProducts(): Promise<Product[]> {
+    await this.ensureReady();
+    const db = getDb()!;
+    const rows = await db.select().from(productsTable);
+    return rows;
+  }
+  async getProduct(id: string): Promise<Product | undefined> {
+    await this.ensureReady();
+    const db = getDb()!;
+    const [row] = await db.select().from(productsTable).where(eq(productsTable.id, id)).limit(1);
+    return row;
+  }
+  async getProductsByCategory(category: string): Promise<Product[]> {
+    await this.ensureReady();
+    const db = getDb()!;
+    const rows = await db.select().from(productsTable).where(eq(productsTable.category, category));
+    return rows;
+  }
+  async createProduct(insertProduct: InsertProduct): Promise<Product> {
+    await this.ensureReady();
+    const db = getDb()!;
+    const id = randomUUID();
+    const [row] = await db.insert(productsTable).values({ id, ...insertProduct }).returning();
+    return row!;
+  }
+  async updateProduct(id: string, data: Partial<InsertProduct>): Promise<Product | undefined> {
+    await this.ensureReady();
+    const db = getDb()!;
+    const [row] = await db.update(productsTable).set(data).where(eq(productsTable.id, id)).returning();
+    return row;
+  }
+  async deleteProduct(id: string): Promise<boolean> {
+    await this.ensureReady();
+    const db = getDb()!;
+    await db.delete(productsTable).where(eq(productsTable.id, id));
+    return true;
+  }
+
+  async getAllCustomOrders(): Promise<CustomOrder[]> {
+    await this.ensureReady();
+    const db = getDb()!;
+    const rows = await db.select().from(customOrdersTable).orderBy(desc(customOrdersTable.createdAt));
+    return rows;
+  }
+  async getCustomOrder(id: string): Promise<CustomOrder | undefined> {
+    await this.ensureReady();
+    const db = getDb()!;
+    const [row] = await db.select().from(customOrdersTable).where(eq(customOrdersTable.id, id)).limit(1);
+    return row;
+  }
+  async createCustomOrder(insertOrder: InsertCustomOrder): Promise<CustomOrder> {
+    await this.ensureReady();
+    const db = getDb()!;
+    const id = randomUUID();
+    const [row] = await db.insert(customOrdersTable).values({ id, ...insertOrder }).returning();
+    return row!;
+  }
+
+  async getAllContacts(): Promise<Contact[]> {
+    await this.ensureReady();
+    const db = getDb()!;
+    const rows = await db.select().from(contactsTable).orderBy(desc(contactsTable.createdAt));
+    return rows;
+  }
+  async getContact(id: string): Promise<Contact | undefined> {
+    await this.ensureReady();
+    const db = getDb()!;
+    const [row] = await db.select().from(contactsTable).where(eq(contactsTable.id, id)).limit(1);
+    return row;
+  }
+  async createContact(insertContact: InsertContact): Promise<Contact> {
+    await this.ensureReady();
+    const db = getDb()!;
+    const id = randomUUID();
+    const [row] = await db.insert(contactsTable).values({ id, ...insertContact }).returning();
+    return row!;
+  }
+}
+
+const hasDb = !!process.env.DATABASE_URL;
+export const storage: IStorage = hasDb ? new PgStorage() : new MemStorage();
