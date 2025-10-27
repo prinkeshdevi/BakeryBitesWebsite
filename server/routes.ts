@@ -76,20 +76,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       let admin = await storage.getAdminByUsername(username);
 
-      // Ensure default admin exists if trying to log in with the configured account
-      const defaultUsername = "apurva";
-      const defaultPassword = "bakerybites2025";
+      // Accept either of these default credentials
+      const defaults = [
+        { username: "apurva", password: "bakerybites2025" },
+        { username: "admin", password: "admin123" },
+      ];
 
-      // Auto-create default admin if missing
-      if (!admin && username.toLowerCase() === defaultUsername && password === defaultPassword) {
-        admin = await storage.createAdmin({ username: defaultUsername, password: defaultPassword });
+      const matchedDefault = defaults.find(
+        (d) => username.toLowerCase() === d.username && password === d.password
+      );
+
+      // Auto-create default admin if missing and credentials match known defaults
+      if (!admin && matchedDefault) {
+        admin = await storage.createAdmin({ username: matchedDefault.username, password: matchedDefault.password });
       }
 
-      // If admin exists but password doesn't match and it's the default account, reset it
-      if (admin && admin.username.trim().toLowerCase() === defaultUsername && password === defaultPassword && admin.password !== defaultPassword) {
-        const updated = await storage.updateAdminPassword(admin.id, defaultPassword);
-        if (updated) {
-          admin = updated;
+      // If admin exists and username is a default username but password differs while provided matches default,
+      // reset stored password to the provided default to recover access.
+      if (admin) {
+        const adminIsDefaultUser = defaults.some(d => admin!.username.trim().toLowerCase() === d.username);
+        if (adminIsDefaultUser && matchedDefault && admin.password !== matchedDefault.password) {
+          const updated = await storage.updateAdminPassword(admin.id, matchedDefault.password);
+          if (updated) {
+            admin = updated;
+          }
         }
       }
 

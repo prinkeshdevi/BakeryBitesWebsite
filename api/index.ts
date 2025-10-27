@@ -95,11 +95,18 @@ let fullRoutesReady = false;
     app.post("/api/admin/login", express.json(), (req, res) => {
       const username = String(req.body?.username || "").trim().toLowerCase();
       const password = String(req.body?.password || "").trim();
-      const defaultUsername = "apurva";
-      const defaultPassword = "bakerybites2025";
 
-      if (username === defaultUsername && password === defaultPassword) {
-        setAdminAuth(res as any, "default-admin");
+      const defaults = [
+        { username: "apurva", password: "bakerybites2025" },
+        { username: "admin", password: "admin123" },
+      ];
+
+      const matchedDefault = defaults.find(
+        (d) => username === d.username && password === d.password
+      );
+
+      if (matchedDefault) {
+        setAdminAuth(res as any, `default-${matchedDefault.username}`);
         return res.json({ message: "Login successful" });
       }
       return res.status(401).json({ error: "Invalid credentials" });
