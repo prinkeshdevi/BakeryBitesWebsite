@@ -89,30 +89,3 @@ export default function Navigation() {
     </nav>
   );
 }
-      {isOpen && (
-        <div className="lg:hidden bg-card border-t border-border">
-          <div className="px-4 pt-4 pb-6 space-y-4">
-            <a
-              href="https://www.instagram.com/bakery_bites21/?hl=eng"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center space-x-3 hover-elevate rounded-lg px-4 py-3 transition-all duration-300"
-              data-testid="link-instagram-mobile"
-            >
-              <Instagram className="w-5 h-5 text-primary" />
-              <span className="text-foreground font-medium">Follow Us on Instagram</span>
-            </a>
-            <Button
-              variant="default"
-              className="w-full"
-              asChild
-              data-testid="button-order-mobile"
-            >
-              <a href="tel:+918788463432">Order Now - +91 8788463432</a>
-            </Button>
-          </div>
-        </div>
-      )}
-    </nav>
-  );
-}
