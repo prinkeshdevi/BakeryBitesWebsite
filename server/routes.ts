@@ -21,10 +21,10 @@ if (!existsSync(uploadDir)) {
 }
 
 const multerStorage = multer.diskStorage({
-  destination: (req: Request, file: multer.MulterFile, cb: (error: any, destination: string) => void) => {
+  destination: (req: Request, file: any, cb: (error: any, destination: string) => void) => {
     cb(null, uploadDir);
   },
-  filename: (req: Request, file: multer.MulterFile, cb: (error: any, filename: string) => void) => {
+  filename: (req: Request, file: any, cb: (error: any, filename: string) => void) => {
     const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
     cb(null, uniqueSuffix + path.extname(file.originalname));
   },
@@ -33,7 +33,7 @@ const multerStorage = multer.diskStorage({
 const upload = multer({
   storage: multerStorage,
   limits: { fileSize: 10 * 1024 * 1024 }, // 10MB
-  fileFilter: (req: Request, file: multer.MulterFile, cb: multer.FileFilterCallback) => {
+  fileFilter: (req: Request, file: any, cb: any) => {
     const allowedTypes = /jpeg|jpg|png|gif|mp4|mov|avi/;
     const extname = allowedTypes.test(
       path.extname(file.originalname).toLowerCase()
@@ -158,7 +158,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     upload.single("image"),
     async (req, res) => {
       try {
-        const mreq = req as Request & { file?: multer.MulterFile };
+        const mreq = req as Request & { file?: any };
         if (!mreq.file) {
           return res.status(400).json({ error: "No file uploaded" });
         }
@@ -306,7 +306,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // File Upload Route (for product images)
   app.post("/api/upload", requireAuth, upload.single("image"), (req, res) => {
     try {
-      const mreq = req as Request & { file?: multer.MulterFile };
+      const mreq = req as Request & { file?: any };
       if (!mreq.file) {
         return res.status(400).json({ error: "No file uploaded" });
       }
