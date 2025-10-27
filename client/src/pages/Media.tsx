@@ -1,19 +1,22 @@
 import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
-import AdminLogin from "@/components/admin/AdminLogin";
 import SlideshowManager from "@/components/admin/SlideshowManager";
 import ProductManager from "@/components/admin/ProductManager";
 import OrdersAndContacts from "@/components/admin/OrdersAndContacts";
 import UploadsManager from "@/components/admin/UploadsManager";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { LogOut, Home, Images } from "lucide-react";
+import { LogOut, Home, Images, Lock } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 
 export default function Media() {
   const [, setLocation] = useLocation();
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [pwd, setPwd] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -22,7 +25,7 @@ export default function Media() {
         setIsLoading(false);
         setIsAuthenticated(false);
       }
-    }, 10000); // 10s max loading
+    }, 8000); // max loading
 
     checkAuth().finally(() => {
       if (!cancelled) clearTimeout(t);
@@ -42,6 +45,25 @@ export default function Media() {
       setIsAuthenticated(false);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const simplePasswordLogin = async () => {
+    setSubmitting(true);
+    setError(null);
+    try {
+      // Only password required. Use fixed username 'apurva' server-side.
+      const res = await apiRequest("POST", "/api/admin/login", {
+        username: "apurva",
+        password: pwd,
+      });
+      if (res.ok) {
+        setIsAuthenticated(true);
+      }
+    } catch (e: any) {
+      setError("Invalid password");
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -67,7 +89,41 @@ export default function Media() {
   }
 
   if (!isAuthenticated) {
-    return <AdminLogin onLoginSuccess={() => setIsAuthenticated(true)} />;
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background px-4">
+        <div className="w-full max-w-sm border rounded-lg p-6 shadow-sm bg-card">
+          <div className="flex items-center gap-2 mb-4">
+            <Lock className="w-5 h-5 text-primary" />
+            <h2 className="text-lg font-semibold">Enter Media Password</h2>
+          </div>
+          <div className="space-y-3">
+            <Input
+              type="password"
+              placeholder="Password"
+              value={pwd}
+              onChange={(e) => setPwd(e.target.value)}
+              disabled={submitting}
+              data-testid="media-password-input"
+            />
+            {error ? (
+              <p className="text-sm text-destructive">{error}</p>
+            ) : (
+              <p className="text-xs text-muted-foreground">
+                Hint: bakerybites2025
+              </p>
+            )}
+            <Button
+              className="w-full"
+              onClick={simplePasswordLogin}
+              disabled={submitting || !pwd}
+              data-testid="media-password-submit"
+            >
+              {submitting ? "Checking..." : "Enter"}
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   return (
