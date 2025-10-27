@@ -10,6 +10,7 @@ import {
   insertCustomOrderSchema,
   insertContactSchema,
 } from "../shared/schema";
+import { clearAdminAuth, getAdminIdFromReq, requireAuthJWT, setAdminAuth } from "./auth";
 
 // Configure multer for file uploads
 // On Vercel serverless, the filesystem is read-only except for /tmp
@@ -47,9 +48,12 @@ const upload = multer({
   },
 });
 
-// Authentication middleware
+// Authentication middleware that supports both session and JWT cookie
 function requireAuth(req: any, res: any, next: any) {
-  if (req.session?.adminId) {
+  const sessionId = req.session?.adminId;
+  const jwtId = getAdminIdFromReq(req);
+  if (sessionId || jwtId) {
+    req.adminId = sessionId || jwtId;
     next();
   } else {
     res.status(401).json({ error: "Unauthorized" });
@@ -76,16 +80,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const defaultUsername = "apurva";
       const defaultPassword = "bakerybites2025";
 
-      if (!admin && username.toLowerCase() === defaultUsername) {
-        // auto-create default admin if not present
+      // Auto-create default admin if missing
+      if (!admin && username.toLowerCase() === defaultUsername && password === defaultPassword) {
         admin = await storage.createAdmin({ username: defaultUsername, password: defaultPassword });
+      }
+
+      // If admin exists but password doesn't match and it's the default account, reset it
+      if (admin && admin.username.trim().toLowerCase() === defaultUsername && password === defaultPassword && admin.password !== defaultPassword) {
+        const updated = await storage.updateAdminPassword(admin.id, defaultPassword);
+        if (updated) {
+          admin = updated;
+        }
       }
 
       if (!admin || admin.password !== password) {
         return res.status(401).json({ error: "Invalid credentials" });
       }
 
+      // Set either session or JWT cookie for auth
       req.session.adminId = admin.id;
+      setAdminAuth(res, admin.id);
+
       res.json({ message: "Login successful" });
     } catch (error) {
       res.status(500).json({ error: "Internal server error" });
@@ -93,12 +108,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   app.post("/api/admin/logout", (req, res) => {
-    req.session.destroy((err) => {
-      if (err) {
-        return res.status(500).json({ error: "Failed to logout" });
-      }
+    clearAdminAuth(res);
+    if (req.session) {
+      req.session.destroy((err: any) => {
+        if (err) {
+          return res.status(500).json({ error: "Failed to logout" });
+        }
+        res.json({ message: "Logout successful" });
+      });
+    } else {
       res.json({ message: "Logout successful" });
-    });
+    }
   });
 
   app.get("/api/admin/check", requireAuth, (req, res) => {
