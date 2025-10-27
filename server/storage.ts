@@ -51,6 +51,7 @@ export interface IStorage {
 
   // Uploads methods
   getAllUploads(): Promise<Upload[]>;
+  getUploadByFilename(filename: string): Promise<Upload | undefined>;
   createUpload(upload: InsertUpload): Promise<Upload>;
   deleteUploadByFilename(filename: string): Promise<boolean>;
 
@@ -403,11 +404,18 @@ export class MemStorage implements IStorage {
       mimetype: insert.mimetype,
       size: insert.size,
       isVideo: insert.isVideo ?? false,
+      publicId: (insert as any).publicId ?? null,
       createdAt: new Date(),
-    };
+    } as any;
     this.uploads.set(id, row);
     this.saveToDisk();
     return row;
+  }
+  async getUploadByFilename(filename: string): Promise<Upload | undefined> {
+    for (const u of this.uploads.values()) {
+      if (u.filename === filename) return u;
+    }
+    return undefined;
   }
   async deleteUploadByFilename(filename: string): Promise<boolean> {
     let deleted = false;

@@ -103,6 +103,7 @@ export const uploads = pgTable("uploads", {
   mimetype: text("mimetype").notNull(),
   size: integer("size").notNull(),
   isVideo: boolean("is_video").notNull().default(false),
+  publicId: text("public_id"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
