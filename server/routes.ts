@@ -306,11 +306,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // File Upload Route (for product images)
   app.post("/api/upload", requireAuth, upload.single("image"), (req, res) => {
     try {
-      if (!req.file) {
+      const mreq = req as Request & { file?: Express.Multer.File };
+      if (!mreq.file) {
         return res.status(400).json({ error: "No file uploaded" });
       }
 
-      const imageUrl = `/uploads/${req.file.filename}`;
+      const imageUrl = `/uploads/${mreq.file.filename}`;
       res.json({ url: imageUrl });
     } catch (error) {
       res.status(500).json({ error: "Failed to upload file" });
