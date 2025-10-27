@@ -164,7 +164,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
           return res.status(400).json({ error: "No file uploaded" });
         }
 
-        const imageUrl = `/uploads/${mreq.file.filename}`;
+        let imageUrl = `/uploads/${mreq.file.filename}`;
+        if (isCloudinaryEnabled()) {
+          try {
+            const localPath = path.join(uploadDir, mreq.file.filename);
+            const uploaded = await uploadLocalFileToCloudinary(localPath, {
+              folder: process.env.CLOUDINARY_UPLOAD_FOLDER || "bakery-bites",
+            });
+            imageUrl = uploaded.url;
+          } catch {}
+        }
+
         const images = await storage.getAllSlideshowImages();
         const maxOrder = images.length > 0 ? Math.max(...images.map((i) => i.order)) : -1;
 

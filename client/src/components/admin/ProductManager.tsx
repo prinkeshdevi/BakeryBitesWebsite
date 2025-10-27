@@ -256,11 +256,20 @@ export default function ProductManager() {
                   className="flex items-center gap-4 p-4 border rounded-lg hover-elevate"
                   data-testid={`product-item-${product.id}`}
                 >
-                  <img
-                    src={product.imageUrl}
-                    alt={product.name}
-                    className="w-20 h-20 object-cover rounded-md"
-                  />
+                  {/\\.(mp4|mov|avi|webm|mkv)(\\?|#|$)/i.test(product.imageUrl) ? (
+                    <video
+                      src={product.imageUrl}
+                      className="w-20 h-20 object-cover rounded-md"
+                      controls
+                      preload="metadata"
+                    />
+                  ) : (
+                    <img
+                      src={product.imageUrl}
+                      alt={product.name}
+                      className="w-20 h-20 object-cover rounded-md"
+                    />
+                  )}
                   <div className="flex-1">
                     <h4 className="font-semibold">{product.name}</h4>
                     <p className="text-sm text-muted-foreground line-clamp-1">

@@ -2,6 +2,8 @@ import express from "express";
 import session from "express-session";
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import path from "path";
+import { getDb } from "../server/db";
+import { sql } from "drizzle-orm";
 
 // Minimal Express app suitable for Vercel Serverless Functions.
 // No Vite dev middleware here. Static files are handled by Vercel (see vercel.json).
@@ -56,6 +58,18 @@ app.get("/api/health", (_req, res) => {
     env: process.env.NODE_ENV || "development",
     time: new Date().toISOString(),
   });
+});
+
+// DB connectivity health check
+app.get("/api/db/health", async (_req, res) => {
+  try {
+    const db = getDb();
+    if (!db) return res.json({ connected: false, reason: "DATABASE_URL not set" });
+    await db.execute(sql`select 1`);
+    res.json({ connected: true });
+  } catch (e: any) {
+    res.status(500).json({ connected: false, error: e?.message || String(e) });
+  }
 });
 
 // Always-available admin check, even if full routes fail to load
