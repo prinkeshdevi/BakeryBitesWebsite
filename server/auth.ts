@@ -1,5 +1,5 @@
 import type { Request, Response, NextFunction } from "express";
-import jwt from "jsonwebtoken";
+import * as jwt from "jsonwebtoken";
 
 const TOKEN_NAME = "bb_admin";
 const ONE_DAY_MS = 24 * 60 * 60 * 1000;
@@ -48,14 +48,14 @@ export function clearAdminAuth(res: Response) {
 function parseCookie(header: string | undefined): Record<string, string> {
   const out: Record<string, string> = {};
   if (!header) return out;
-  const parts = header.split(";").map((p) => p.trim());
-  for (const part of parts) {
-    const eq = part.indexOf("=");
-    if (eq === -1) continue;
-    const k = decodeURIComponent(part.slice(0, eq));
-    const v = decodeURIComponent(part.slice(eq + 1));
-    // Only first pair is the cookie name=value, subsequent pairs are attributes (ignored)
-    if (!(k in out)) out[k] = v;
+  // Split multiple cookies
+  const pairs = header.split(";").map((p) => p.trim());
+  for (const pair of pairs) {
+    const idx = pair.indexOf("=");
+    if (idx === -1) continue;
+    const key = decodeURIComponent(pair.slice(0, idx));
+    const val = decodeURIComponent(pair.slice(idx + 1));
+    if (!(key in out)) out[key] = val;
   }
   return out;
 }

@@ -2,7 +2,6 @@ import express from "express";
 import session from "express-session";
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import path from "path";
-import { registerRoutes } from "../server/routes";
 
 // Minimal Express app suitable for Vercel Serverless Functions.
 // No Vite dev middleware here. Static files are handled by Vercel (see vercel.json).
@@ -14,6 +13,8 @@ declare module "express-session" {
 }
 
 const app = express();
+// Trust proxy so secure cookies work behind Vercel
+app.set("trust proxy", 1);
 
 app.use(
   session({
@@ -24,6 +25,7 @@ app.use(
       maxAge: 24 * 60 * 60 * 1000, // 24 hours
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
     },
   })
 );
@@ -56,8 +58,24 @@ app.get("/api/health", (_req, res) => {
   });
 });
 
-// Register routes (synchronous in practice)
-registerRoutes(app);
+// Register routes with explicit error surface if import fails
+(async () => {
+  try {
+    const { registerRoutes } = await import("../server/routes");
+    registerRoutes(app);
+  } catch (err: any) {
+    // Surface import errors at /api/health for quick diagnostics
+    const msg = (err && (err.stack || err.message)) || String(err);
+    // eslint-disable-next-line no-console
+    console.error("Failed to register routes:", msg);
+    app.get("/api/admin/login", (_req, res) => {
+      res.status(500).json({ error: "Routes init failed", detail: msg });
+    });
+    app.all("/api/*", (_req, res) => {
+      res.status(500).json({ error: "Routes init failed", detail: msg });
+    });
+  }
+})();
 
 // Vercel Node runtime expects a default handler(req, res)
 export default function handler(req: VercelRequest, res: VercelResponse) {
