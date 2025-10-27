@@ -9,7 +9,7 @@ import {
   insertProductSchema,
   insertCustomOrderSchema,
   insertContactSchema,
-} from "@shared/schema";
+} from "../shared/schema";
 
 // Configure multer for file uploads
 const uploadDir = path.join(process.cwd(), "uploads");

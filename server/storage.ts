@@ -9,7 +9,7 @@ import {
   type InsertCustomOrder,
   type Contact,
   type InsertContact,
-} from "@shared/schema";
+} from "../shared/schema";
 import { randomUUID } from "crypto";
 
 export interface IStorage {
