@@ -1,127 +1,14 @@
-import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import SlideshowManager from "@/components/admin/SlideshowManager";
 import ProductManager from "@/components/admin/ProductManager";
 import OrdersAndContacts from "@/components/admin/OrdersAndContacts";
 import UploadsManager from "@/components/admin/UploadsManager";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { LogOut, Home, Images, Lock } from "lucide-react";
-import { apiRequest } from "@/lib/queryClient";
+import { Home, Images } from "lucide-react";
 
 export default function Media() {
   const [, setLocation] = useLocation();
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
-  const [pwd, setPwd] = useState("");
-  const [error, setError] = useState<string | null>(null);
-  const [submitting, setSubmitting] = useState(false);
-
-  useEffect(() => {
-    let cancelled = false;
-    const t = setTimeout(() => {
-      if (!cancelled) {
-        setIsLoading(false);
-        setIsAuthenticated(false);
-      }
-    }, 8000); // max loading
-
-    checkAuth().finally(() => {
-      if (!cancelled) clearTimeout(t);
-    });
-
-    return () => {
-      cancelled = true;
-      clearTimeout(t);
-    };
-  }, []);
-
-  const checkAuth = async () => {
-    try {
-      await apiRequest("GET", "/api/admin/check");
-      setIsAuthenticated(true);
-    } catch {
-      setIsAuthenticated(false);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const simplePasswordLogin = async () => {
-    setSubmitting(true);
-    setError(null);
-    try {
-      // Only password required – use dedicated endpoint
-      const res = await apiRequest("POST", "/api/media/login", { password: pwd });
-      if (res.ok) {
-        setIsAuthenticated(true);
-      }
-    } catch (e: any) {
-      setError("Invalid password");
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  const handleLogout = async () => {
-    try {
-      await apiRequest("POST", "/api/admin/logout", {});
-      setIsAuthenticated(false);
-      setLocation("/");
-    } catch (error) {
-      console.error("Logout failed:", error);
-    }
-  };
-
-  if (isLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="text-center">
-          <div className="w-16 h-16 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-          <p className="text-muted-foreground">Loading...</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (!isAuthenticated) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background px-4">
-        <div className="w-full max-w-sm border rounded-lg p-6 shadow-sm bg-card">
-          <div className="flex items-center gap-2 mb-4">
-            <Lock className="w-5 h-5 text-primary" />
-            <h2 className="text-lg font-semibold">Enter Media Password</h2>
-          </div>
-          <div className="space-y-3">
-            <Input
-              type="password"
-              placeholder="Password"
-              value={pwd}
-              onChange={(e) => setPwd(e.target.value)}
-              disabled={submitting}
-              data-testid="media-password-input"
-            />
-            {error ? (
-              <p className="text-sm text-destructive">{error}</p>
-            ) : (
-              <p className="text-xs text-muted-foreground">
-                Hint: bakerybites2025
-              </p>
-            )}
-            <Button
-              className="w-full"
-              onClick={simplePasswordLogin}
-              disabled={submitting || !pwd}
-              data-testid="media-password-submit"
-            >
-              {submitting ? "Checking..." : "Enter"}
-            </Button>
-          </div>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="min-h-screen bg-background">
@@ -140,14 +27,6 @@ export default function Media() {
               >
                 <Home className="w-4 h-4 mr-2" />
                 View Site
-              </Button>
-              <Button
-                variant="destructive"
-                onClick={handleLogout}
-                data-testid="button-logout"
-              >
-                <LogOut className="w-4 h-4 mr-2" />
-                Logout
               </Button>
             </div>
           </div>
