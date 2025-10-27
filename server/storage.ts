@@ -16,6 +16,7 @@ export interface IStorage {
   // Admin methods
   getAdminByUsername(username: string): Promise<Admin | undefined>;
   createAdmin(admin: InsertAdmin): Promise<Admin>;
+  updateAdminPassword(id: string, password: string): Promise<Admin | undefined>;
 
   // Slideshow methods
   getAllSlideshowImages(): Promise<SlideshowImage[]>;
@@ -63,7 +64,7 @@ export class MemStorage implements IStorage {
     this.customOrders = new Map();
     this.contacts = new Map();
 
-    // Create default admin (username: admin, password: admin123)
+    // Create default admin (username: apurva, password: bakerybites2025)
     this.createAdmin({ username: "apurva", password: "bakerybites2025" });
 
     // Seed slideshow images
@@ -222,6 +223,14 @@ export class MemStorage implements IStorage {
     const admin: Admin = { ...insertAdmin, id };
     this.admins.set(id, admin);
     return admin;
+  }
+
+  async updateAdminPassword(id: string, password: string): Promise<Admin | undefined> {
+    const existing = this.admins.get(id);
+    if (!existing) return undefined;
+    const updated = { ...existing, password };
+    this.admins.set(id, updated);
+    return updated;
   }
 
   // Slideshow methods
