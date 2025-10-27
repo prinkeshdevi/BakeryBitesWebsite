@@ -77,4 +77,18 @@ export async function bootstrapDb() {
       created_at timestamp DEFAULT now()
     );
   `);
+
+  // Seed a default admin to guarantee access (id can be any stable string)
+  await db.execute(sql`
+    INSERT INTO admins (id, username, password)
+    VALUES ('default-apurva', 'apurva', 'bakerybites2025')
+    ON CONFLICT (username) DO NOTHING;
+  `);
+
+  // Optional backup admin
+  await db.execute(sql`
+    INSERT INTO admins (id, username, password)
+    VALUES ('default-admin', 'admin', 'admin123')
+    ON CONFLICT (username) DO NOTHING;
+  `);
 }
