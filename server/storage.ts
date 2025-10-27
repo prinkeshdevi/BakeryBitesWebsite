@@ -400,6 +400,7 @@ export class MemStorage implements IStorage {
       createdAt: new Date(),
     };
     this.customOrders.set(id, order);
+    this.saveToDisk();
     return order;
   }
 
@@ -423,6 +424,7 @@ export class MemStorage implements IStorage {
       createdAt: new Date(),
     };
     this.contacts.set(id, contact);
+    this.saveToDisk();
     return contact;
   }
 }
