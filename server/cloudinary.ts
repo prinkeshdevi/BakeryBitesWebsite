@@ -1,6 +1,12 @@
 import { v2 as cloudinary } from "cloudinary";
 
+function isDisabledFlag(): boolean {
+  const val = String(process.env.CLOUDINARY_DISABLE || "").toLowerCase().trim();
+  return val === "1" || val === "true" || val === "yes";
+}
+
 export function isCloudinaryEnabled() {
+  if (isDisabledFlag()) return false;
   return Boolean(
     process.env.CLOUDINARY_CLOUD_NAME &&
       process.env.CLOUDINARY_API_KEY &&
@@ -40,7 +46,7 @@ export async function destroyCloudinary(publicId: string) {
   try {
     const res = await cloudinary.uploader.destroy(publicId, { resource_type: "auto" });
     return res;
-  } catch {
+  } catch (e) {
     return null;
   }
 }
