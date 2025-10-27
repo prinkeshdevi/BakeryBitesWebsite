@@ -70,6 +70,23 @@ app.get("/api/admin/check", async (req, res) => {
   }
 });
 
+// Simple password-only login for /media
+app.post("/api/media/login", async (req, res) => {
+  try {
+    const [{ setAdminAuth }] = await Promise.all([import("../server/auth")]);
+    const password = String(req.body?.password || "").trim();
+    if (password === "bakerybites2025") {
+      // issue auth cookie with a stable id
+      (req as any).session.adminId = "media-admin";
+      setAdminAuth(res as any, "media-admin");
+      return res.json({ message: "Login successful" });
+    }
+    return res.status(401).json({ error: "Invalid password" });
+  } catch (e: any) {
+    return res.status(500).json({ error: "Media login failed", detail: e?.message || String(e) });
+  }
+});
+
 function extractCreds(req: any) {
   try {
     const hasBody = req.body && (req.body.username !== undefined || req.body.password !== undefined);

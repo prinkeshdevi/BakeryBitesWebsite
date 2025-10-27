@@ -66,6 +66,7 @@ export class MemStorage implements IStorage {
   private products: Map<string, Product>;
   private customOrders: Map<string, CustomOrder>;
   private contacts: Map<string, Contact>;
+  private persistPath: string | null;
 
   constructor() {
     this.admins = new Map();
@@ -73,15 +74,59 @@ export class MemStorage implements IStorage {
     this.products = new Map();
     this.customOrders = new Map();
     this.contacts = new Map();
+    // Persist to JSON when running without DATABASE_URL (use /tmp on Vercel)
+    const base = process.env.VERCEL ? "/tmp" : process.cwd();
+    this.persistPath = `${base}/uploads_state.json`;
+    this.loadFromDisk();
 
     // Create default admin (username: apurva, password: bakerybites2025)
-    this.createAdmin({ username: "apurva", password: "bakerybites2025" });
+    if (!Array.from(this.admins.values()).some(a => a.username.toLowerCase() === "apurva")) {
+      this.createAdmin({ username: "apurva", password: "bakerybites2025" });
+    }
 
-    // Seed slideshow images
-    this.seedSlideshowImages();
+    // Seed slideshow images (only if empty)
+    if (this.slideshowImages.size === 0) {
+      this.seedSlideshowImages();
+    }
 
-    // Seed products
-    this.seedProducts();
+    // Seed products (only if empty)
+    if (this.products.size === 0) {
+      this.seedProducts();
+    }
+  }
+
+  private loadFromDisk() {
+    try {
+      const fs = require("fs");
+      if (this.persistPath && fs.existsSync(this.persistPath)) {
+        const raw = fs.readFileSync(this.persistPath, "utf-8");
+        const data = JSON.parse(raw || "{}");
+        if (data.admins) for (const a of data.admins as Admin[]) this.admins.set(a.id, a);
+        if (data.slideshowImages) for (const i of data.slideshowImages as SlideshowImage[]) this.slideshowImages.set(i.id, i);
+        if (data.products) for (const p of data.products as Product[]) this.products.set(p.id, p);
+        if (data.customOrders) for (const o of data.customOrders as CustomOrder[]) this.customOrders.set(o.id, o);
+        if (data.contacts) for (const c of data.contacts as Contact[]) this.contacts.set(c.id, c);
+      }
+    } catch {
+      // ignore
+    }
+  }
+
+  private saveToDisk() {
+    try {
+      if (!this.persistPath) return;
+      const fs = require("fs");
+      const payload = {
+        admins: Array.from(this.admins.values()),
+        slideshowImages: Array.from(this.slideshowImages.values()),
+        products: Array.from(this.products.values()),
+        customOrders: Array.from(this.customOrders.values()),
+        contacts: Array.from(this.contacts.values()),
+      };
+      fs.writeFileSync(this.persistPath, JSON.stringify(payload));
+    } catch {
+      // ignore
+    }
   }
 
   private seedSlideshowImages() {
@@ -264,6 +309,7 @@ export class MemStorage implements IStorage {
       createdAt: new Date(),
     };
     this.slideshowImages.set(id, image);
+    this.saveToDisk();
     return image;
   }
 
@@ -312,6 +358,7 @@ export class MemStorage implements IStorage {
       createdAt: new Date(),
     };
     this.products.set(id, product);
+    this.saveToDisk();
     return product;
   }
 

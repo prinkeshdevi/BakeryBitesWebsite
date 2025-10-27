@@ -52,11 +52,8 @@ export default function Media() {
     setSubmitting(true);
     setError(null);
     try {
-      // Only password required. Use fixed username 'apurva' server-side.
-      const res = await apiRequest("POST", "/api/admin/login", {
-        username: "apurva",
-        password: pwd,
-      });
+      // Only password required – use dedicated endpoint
+      const res = await apiRequest("POST", "/api/media/login", { password: pwd });
       if (res.ok) {
         setIsAuthenticated(true);
       }
