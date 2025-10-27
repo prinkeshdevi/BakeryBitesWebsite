@@ -30,16 +30,13 @@ export default defineConfig(async () => {
         "@": path.resolve(__dirname, "client", "src"),
         "@shared": path.resolve(__dirname, "shared"),
         "@assets": path.resolve(__dirname, "attached_assets"),
+        "@radix-ui/react-tooltip": path.resolve(__dirname, "client", "src", "lib", "stubs", "radix-tooltip.ts"),
       },
     },
     root: path.resolve(__dirname, "client"),
     build: {
       outDir: path.resolve(__dirname, "dist/public"),
       emptyOutDir: true,
-      rollupOptions: {
-        // In case any component still references this at build time
-        external: ["@radix-ui/react-tooltip"],
-      },
     },
     server: {
       fs: {
