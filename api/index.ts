@@ -58,6 +58,18 @@ app.get("/api/health", (_req, res) => {
   });
 });
 
+// Always-available admin check, even if full routes fail to load
+app.get("/api/admin/check", async (req, res) => {
+  try {
+    const { getAdminIdFromReq } = await import("../server/auth");
+    const id = getAdminIdFromReq(req as any);
+    if (id) return res.json({ authenticated: true });
+    return res.status(401).json({ authenticated: false });
+  } catch (e: any) {
+    return res.status(500).json({ error: "Auth check failed", detail: e?.message || String(e) });
+  }
+});
+
 // Try to register the full server routes. If it fails, add minimal fallbacks
 let fullRoutesReady = false;
 (async () => {
@@ -70,12 +82,33 @@ let fullRoutesReady = false;
     // eslint-disable-next-line no-console
     console.error("Failed to register routes:", msg);
 
-    // Minimal fallbacks so orders and contacts can still be submitted
+    // Minimal fallbacks so login, orders and contacts can still be submitted
     let memoryOrders: any[] = [];
     let memoryContacts: any[] = [];
 
-    // Load validation schema lazily
-    const { insertCustomOrderSchema, insertContactSchema } = await import("../shared/schema");
+    // Load helpers and validation schema lazily
+    const [{ setAdminAuth, clearAdminAuth }, { insertCustomOrderSchema, insertContactSchema }] = await Promise.all([
+      import("../server/auth"),
+      import("../shared/schema"),
+    ]);
+
+    app.post("/api/admin/login", express.json(), (req, res) => {
+      const username = String(req.body?.username || "").trim().toLowerCase();
+      const password = String(req.body?.password || "").trim();
+      const defaultUsername = "apurva";
+      const defaultPassword = "bakerybites2025";
+
+      if (username === defaultUsername && password === defaultPassword) {
+        setAdminAuth(res as any, "default-admin");
+        return res.json({ message: "Login successful" });
+      }
+      return res.status(401).json({ error: "Invalid credentials" });
+    });
+
+    app.post("/api/admin/logout", (_req, res) => {
+      clearAdminAuth(res as any);
+      res.json({ message: "Logout successful" });
+    });
 
     app.post("/api/orders/custom", (req, res) => {
       try {
