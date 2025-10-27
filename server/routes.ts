@@ -304,14 +304,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // File Upload Route (for product images) - public to support /media without auth
-  app.post("/api/upload", upload.single("image"), (req, res) => {
+  app.post("/api/upload", upload.single("image"), async (req, res) => {
     try {
       const mreq = req as Request & { file?: any };
       if (!mreq.file) {
         return res.status(400).json({ error: "No file uploaded" });
       }
 
-      const imageUrl = `/uploads/${mreq.file.filename}`;
+      const file = mreq.file;
+      const imageUrl = `/uploads/${file.filename}`;
+      const isVideo =
+        /\.(mp4|mov|avi|webm|mkv)$/i.test((file.originalname || "").toLowerCase()) ||
+        /^video\\//i.test(String(file.mimetype || ""));
+
+      // Persist upload metadata (DB if available, otherwise memory)
+      try {
+        await storage.createUpload({
+          filename: file.filename,
+          url: imageUrl,
+          mimetype: String(file.mimetype || "application/octet-stream"),
+          size: Number(file.size || 0),
+          isVideo,
+        } as any);
+      } catch {
+        // ignore metadata failures
+      }
+
       res.json({ url: imageUrl });
     } catch (error) {
       res.status(500).json({ error: "Failed to upload file" });
@@ -358,9 +376,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Uploads listing and deletion
-  app.get("/api/uploads", requireAuth, (_req, res) => {
+  // Uploads listing and deletion (public to support /media)
+  app.get("/api/uploads", async (_req, res) => {
     try {
+      try {
+        const rows = await storage.getAllUploads();
+        if (rows && rows.length) {
+          const mapped = rows.map((u) => ({
+            name: u.filename,
+            size: Number((u as any).size || 0),
+            modifiedAt: (u as any).createdAt ? new Date((u as any).createdAt as any).getTime() : Date.now(),
+            url: u.url,
+            isVideo: !!(u as any).isVideo,
+          })).sort((a, b) => b.modifiedAt - a.modifiedAt);
+          return res.json(mapped);
+        }
+      } catch {
+        // fall back to FS
+      }
       if (!existsSync(uploadDir)) {
         return res.json([]);
       }
@@ -384,16 +417,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("/api/uploads/:name", requireAuth, (req, res) => {
+  app.delete("/api/uploads/:name", async (req, res) => {
     try {
       const name = req.params.name;
       // Prevent path traversal
       const safeName = path.basename(name);
       const full = path.join(uploadDir, safeName);
-      if (!existsSync(full)) {
-        return res.status(404).json({ error: "File not found" });
+      if (existsSync(full)) {
+        unlinkSync(full);
       }
-      unlinkSync(full);
+      try {
+        await storage.deleteUploadByFilename(safeName);
+      } catch {}
       res.json({ message: "Deleted" });
     } catch (e) {
       res.status(500).json({ error: "Failed to delete file" });

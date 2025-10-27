@@ -545,8 +545,7 @@ export class PgStorage implements IStorage {
   async deleteSlideshowImage(id: string): Promise<boolean> {
     await this.ensureReady();
     const db = getDb()!;
-    const res = await db.delete(slideshowImagesTable).where(eq(slideshowImagesTable.id, id));
-    // drizzle neon-http returns { rowCount?: number } only on pg driver; here assume success if no error
+    await db.delete(slideshowImagesTable).where(eq(slideshowImagesTable.id, id));
     return true;
   }
 
@@ -585,6 +584,27 @@ export class PgStorage implements IStorage {
     await this.ensureReady();
     const db = getDb()!;
     await db.delete(productsTable).where(eq(productsTable.id, id));
+    return true;
+  }
+
+  // Uploads
+  async getAllUploads(): Promise<Upload[]> {
+    await this.ensureReady();
+    const db = getDb()!;
+    const rows = await db.select().from(uploadsTable).orderBy(desc(uploadsTable.createdAt));
+    return rows;
+  }
+  async createUpload(insert: InsertUpload): Promise<Upload> {
+    await this.ensureReady();
+    const db = getDb()!;
+    const id = randomUUID();
+    const [row] = await db.insert(uploadsTable).values({ id, ...insert }).returning();
+    return row!;
+  }
+  async deleteUploadByFilename(filename: string): Promise<boolean> {
+    await this.ensureReady();
+    const db = getDb()!;
+    await db.delete(uploadsTable).where(eq(uploadsTable.filename, filename));
     return true;
   }
 
