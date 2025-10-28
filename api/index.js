@@ -1,17 +1,7 @@
 import express from "express";
 import session from "express-session";
-import type { VercelRequest, VercelResponse } from "@vercel/node";
 import path from "path";
-import { registerRoutes } from "../server/routes";
-
-// Minimal Express app suitable for Vercel Serverless Functions.
-// No Vite dev middleware here. Static files are handled by Vercel (see vercel.json).
-
-declare module "express-session" {
-  interface SessionData {
-    adminId?: string;
-  }
-}
+import { registerRoutes } from "../server/routes.js";
 
 const app = express();
 
@@ -29,15 +19,10 @@ app.use(
 );
 
 // For JSON bodies and URL-encoded forms
-declare module "http" {
-  interface IncomingMessage {
-    rawBody: unknown;
-  }
-}
 app.use(
   express.json({
     verify: (req, _res, buf) => {
-      (req as any).rawBody = buf;
+      req.rawBody = buf;
     },
   })
 );
@@ -60,7 +45,6 @@ app.get("/api/health", (_req, res) => {
 registerRoutes(app);
 
 // Vercel Node runtime expects a default handler(req, res)
-export default function handler(req: VercelRequest, res: VercelResponse) {
-  // Delegate the request to Express
-  (app as any)(req, res);
+export default function handler(req, res) {
+  app(req, res);
 }

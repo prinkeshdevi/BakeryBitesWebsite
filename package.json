@@ -4,10 +4,10 @@
   "type": "module",
   "license": "MIT",
   "scripts": {
-    "dev": "NODE_ENV=development tsx server/index.ts",
-    "build": "vite build && cp -r attached_assets dist/public/assets && esbuild server/index.ts --platform=node --packages=external --bundle --format=esm --outdir=dist",
+    "dev": "NODE_ENV=development node server/index.js",
+    "build": "vite build && cp -r attached_assets dist/public/assets && esbuild server/index.js --platform=node --packages=external --bundle --format=esm --outdir=dist",
     "start": "NODE_ENV=production node dist/index.js",
-    "check": "tsc",
+    "check": "echo \"TypeScript removed\"",
     "db:push": "drizzle-kit push"
   },
   "dependencies": {
