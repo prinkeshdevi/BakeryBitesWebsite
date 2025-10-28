@@ -20,7 +20,9 @@ app.use(
 );
 
 // Serve uploaded files
-app.use("/uploads", express.static(path.join(process.cwd(), "uploads")));
+// In Vercel/serverless, multer saves to /tmp (see routes.js). Mirror that here.
+const baseUploadDir = process.env.VERCEL ? "/tmp" : process.cwd();
+app.use("/uploads", express.static(path.join(baseUploadDir, "uploads")));
 
 // Serve generated assets
 app.use("/assets", express.static(path.join(process.cwd(), "attached_assets")));
