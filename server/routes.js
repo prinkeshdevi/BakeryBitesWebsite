@@ -3,6 +3,8 @@ import { storage } from "./storage.js";
 import multer from "multer";
 import path from "path";
 import { existsSync, mkdirSync } from "fs";
+import fs from "fs/promises";
+import { put } from "@vercel/blob";
 import {
   insertSlideshowImageSchema,
   insertProductSchema,
@@ -10,25 +12,16 @@ import {
   insertContactSchema,
 } from "../shared/schema.js";
 
-// Configure multer for file uploads
+// Configure upload targets
 const baseUploadDir = process.env.VERCEL ? "/tmp" : process.cwd();
 const uploadDir = path.join(baseUploadDir, "uploads");
 if (!existsSync(uploadDir)) {
   mkdirSync(uploadDir, { recursive: true });
 }
 
-const multerStorage = multer.diskStorage({
-  destination: (_req, _file, cb) => {
-    cb(null, uploadDir);
-  },
-  filename: (_req, file, cb) => {
-    const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
-    cb(null, uniqueSuffix + path.extname(file.originalname));
-  },
-});
-
+// Always use memory storage; decide destination in handler
 const upload = multer({
-  storage: multerStorage,
+  storage: multer.memoryStorage(),
   limits: { fileSize: 10 * 1024 * 1024 }, // 10MB
   fileFilter: (_req, file, cb) => {
     const allowedTypes = /jpeg|jpg|png|gif|mp4|mov|avi/;
@@ -44,6 +37,30 @@ const upload = multer({
     }
   },
 });
+
+async function storeFileAndGetUrl(file) {
+  const addSuffix = `${Date.now()}-${Math.round(Math.random() * 1e9)}`;
+  const ext = path.extname(file.originalname);
+  const baseName = path.basename(file.originalname, ext);
+  const safeName = baseName.replace(/[^a-zA-Z0-9-_]/g, "_");
+  const finalName = `${safeName}-${addSuffix}${ext}`;
+
+  // Prefer Vercel Blob in serverless
+  const token = process.env.BLOB_READ_WRITE_TOKEN;
+  if (token) {
+    const blob = await put(finalName, file.buffer, {
+      access: "public",
+      addRandomSuffix: false,
+      token,
+    });
+    return blob.url;
+  }
+
+  // Fallback to local tmp/disk storage
+  const targetPath = path.join(uploadDir, finalName);
+  await fs.writeFile(targetPath, file.buffer);
+  return `/uploads/${finalName}`;
+}
 
 // Authentication middleware
 function requireAuth(req, res, next) {
@@ -112,7 +129,7 @@ export async function registerRoutes(app) {
           return res.status(400).json({ error: "No file uploaded" });
         }
 
-        const imageUrl = `/uploads/${req.file.filename}`;
+        const imageUrl = await storeFileAndGetUrl(req.file);
         const images = await storage.getAllSlideshowImages();
         const maxOrder =
           images.length > 0 ? Math.max(...images.map((i) => i.order)) : -1;
@@ -124,8 +141,11 @@ export async function registerRoutes(app) {
         });
 
         res.json(newImage);
-      } catch (_error) {
-        res.status(500).json({ error: "Failed to upload image" });
+      } catch (error) {
+        const msg =
+          error?.message ||
+          "Failed to upload image. Ensure BLOB_READ_WRITE_TOKEN is set.";
+        res.status(500).json({ error: msg });
       }
     }
   );
@@ -253,16 +273,19 @@ export async function registerRoutes(app) {
   });
 
   // File Upload Route (for product images)
-  app.post("/api/upload", requireAuth, upload.single("image"), (req, res) => {
+  app.post("/api/upload", requireAuth, upload.single("image"), async (req, res) => {
     try {
       if (!req.file) {
         return res.status(400).json({ error: "No file uploaded" });
       }
 
-      const imageUrl = `/uploads/${req.file.filename}`;
+      const imageUrl = await storeFileAndGetUrl(req.file);
       res.json({ url: imageUrl });
-    } catch (_error) {
-      res.status(500).json({ error: "Failed to upload file" });
+    } catch (error) {
+      const msg =
+        error?.message ||
+        "Failed to upload file. Ensure BLOB_READ_WRITE_TOKEN is set.";
+      res.status(500).json({ error: msg });
     }
   });
 
