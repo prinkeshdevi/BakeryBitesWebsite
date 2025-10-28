@@ -1,12 +1,11 @@
-import express, { type Express } from "express";
+import express from "express";
 import fs from "fs";
 import path from "path";
-
 import { fileURLToPath } from "url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-export function log(message: string, source = "express") {
+export function log(message, source = "express") {
   const formattedTime = new Date().toLocaleTimeString("en-US", {
     hour: "numeric",
     minute: "2-digit",
@@ -17,21 +16,20 @@ export function log(message: string, source = "express") {
   console.log(`${formattedTime} [${source}] ${message}`);
 }
 
-export async function setupVite(app: Express, server: Server) {
-  // Import Vite only in development to avoid requiring it in production
+export async function setupVite(app, server) {
   const { createServer: createViteServer } = await import("vite");
 
   const serverOptions = {
     middlewareMode: true,
     hmr: { server },
-    allowedHosts: true as const,
+    allowedHosts: true,
   };
 
-  // Dynamically import dev-only plugins so production doesn't require them
-  const [{ default: react }, { default: runtimeErrorOverlay }] = await Promise.all([
-    import("@vitejs/plugin-react"),
-    import("@replit/vite-plugin-runtime-error-modal"),
-  ]);
+  const [{ default: react }, { default: runtimeErrorOverlay }] =
+    await Promise.all([
+      import("@vitejs/plugin-react"),
+      import("@replit/vite-plugin-runtime-error-modal"),
+    ]);
 
   const plugins = [react(), runtimeErrorOverlay()];
 
@@ -54,7 +52,7 @@ export async function setupVite(app: Express, server: Server) {
         "@assets": path.resolve(__dirname, "..", "attached_assets"),
       },
     },
-
+  });
 
   app.use(vite.middlewares);
   app.use("*", async (req, res, next) => {
@@ -65,38 +63,36 @@ export async function setupVite(app: Express, server: Server) {
         __dirname,
         "..",
         "client",
-        "index.html",
+        "index.html"
       );
 
-      // always reload the index.html file from disk incase it changes
       let template = await fs.promises.readFile(clientTemplate, "utf-8");
       template = template.replace(
-        `src="/src/main.tsx"`,
-        `src="/src/main.tsx?v=${Date.now()}"`,
+        `src="/src/main.jsx"`,
+        `src="/src/main.jsx?v=${Date.now()}"`
       );
       const page = await vite.transformIndexHtml(url, template);
       res.status(200).set({ "Content-Type": "text/html" }).end(page);
     } catch (e) {
       // Vite provides better stack traces in dev
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (vite as any).ssrFixStacktrace?.(e as Error);
+      const anyVite = vite;
+      anyVite?.ssrFixStacktrace?.(e);
       next(e);
     }
   });
 }
 
-export function serveStatic(app: Express) {
+export function serveStatic(app) {
   const distPath = path.resolve(__dirname, "..", "dist", "public");
 
   if (!fs.existsSync(distPath)) {
     throw new Error(
-      `Could not find the build directory: ${distPath}, make sure to build the client first`,
+      `Could not find the build directory: ${distPath}, make sure to build the client first`
     );
   }
 
   app.use(express.static(distPath));
 
-  // fall through to index.html if the file doesn't exist
   app.use("*", (_req, res) => {
     res.sendFile(path.resolve(distPath, "index.html"));
   });

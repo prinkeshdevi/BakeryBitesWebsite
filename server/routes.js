@@ -1,6 +1,5 @@
-import type { Express } from "express";
-import { createServer, type Server } from "http";
-import { storage } from "./storage";
+import { createServer } from "http";
+import { storage } from "./storage.js";
 import multer from "multer";
 import path from "path";
 import { existsSync, mkdirSync } from "fs";
@@ -9,10 +8,9 @@ import {
   insertProductSchema,
   insertCustomOrderSchema,
   insertContactSchema,
-} from "../shared/schema";
+} from "../shared/schema.js";
 
 // Configure multer for file uploads
-// On Vercel serverless, the filesystem is read-only except for /tmp
 const baseUploadDir = process.env.VERCEL ? "/tmp" : process.cwd();
 const uploadDir = path.join(baseUploadDir, "uploads");
 if (!existsSync(uploadDir)) {
@@ -20,10 +18,10 @@ if (!existsSync(uploadDir)) {
 }
 
 const multerStorage = multer.diskStorage({
-  destination: (req, file, cb) => {
+  destination: (_req, _file, cb) => {
     cb(null, uploadDir);
   },
-  filename: (req, file, cb) => {
+  filename: (_req, file, cb) => {
     const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
     cb(null, uniqueSuffix + path.extname(file.originalname));
   },
@@ -32,7 +30,7 @@ const multerStorage = multer.diskStorage({
 const upload = multer({
   storage: multerStorage,
   limits: { fileSize: 10 * 1024 * 1024 }, // 10MB
-  fileFilter: (req, file, cb) => {
+  fileFilter: (_req, file, cb) => {
     const allowedTypes = /jpeg|jpg|png|gif|mp4|mov|avi/;
     const extname = allowedTypes.test(
       path.extname(file.originalname).toLowerCase()
@@ -48,7 +46,7 @@ const upload = multer({
 });
 
 // Authentication middleware
-function requireAuth(req: any, res: any, next: any) {
+function requireAuth(req, res, next) {
   if (req.session?.adminId) {
     next();
   } else {
@@ -56,14 +54,16 @@ function requireAuth(req: any, res: any, next: any) {
   }
 }
 
-export async function registerRoutes(app: Express): Promise<Server> {
+export async function registerRoutes(app) {
   // Admin Authentication Routes
   app.post("/api/admin/login", async (req, res) => {
     try {
       const { username, password } = req.body;
 
       if (!username || !password) {
-        return res.status(400).json({ error: "Username and password required" });
+        return res
+          .status(400)
+          .json({ error: "Username and password required" });
       }
 
       const admin = await storage.getAdminByUsername(username);
@@ -88,16 +88,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
     });
   });
 
-  app.get("/api/admin/check", requireAuth, (req, res) => {
+  app.get("/api/admin/check", requireAuth, (_req, res) => {
     res.json({ authenticated: true });
   });
 
   // Slideshow Routes
-  app.get("/api/slideshow", async (req, res) => {
+  app.get("/api/slideshow", async (_req, res) => {
     try {
       const images = await storage.getAllSlideshowImages();
       res.json(images.filter((img) => img.isActive));
-    } catch (error) {
+    } catch (_error) {
       res.status(500).json({ error: "Failed to fetch slideshow images" });
     }
   });
@@ -114,7 +114,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         const imageUrl = `/uploads/${req.file.filename}`;
         const images = await storage.getAllSlideshowImages();
-        const maxOrder = images.length > 0 ? Math.max(...images.map((i) => i.order)) : -1;
+        const maxOrder =
+          images.length > 0 ? Math.max(...images.map((i) => i.order)) : -1;
 
         const newImage = await storage.createSlideshowImage({
           imageUrl,
@@ -123,7 +124,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
 
         res.json(newImage);
-      } catch (error) {
+      } catch (_error) {
         res.status(500).json({ error: "Failed to upload image" });
       }
     }
@@ -139,7 +140,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       res.json(updated);
-    } catch (error) {
+    } catch (_error) {
       res.status(500).json({ error: "Failed to update image" });
     }
   });
@@ -154,45 +155,44 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       res.json({ message: "Image deleted successfully" });
-    } catch (error) {
+    } catch (_error) {
       res.status(500).json({ error: "Failed to delete image" });
     }
   });
 
   // Product Routes
-  app.get("/api/products", async (req, res) => {
+  app.get("/api/products", async (_req, res) => {
     try {
       const products = await storage.getAllProducts();
       res.json(products);
-    } catch (error) {
+    } catch (_error) {
       res.status(500).json({ error: "Failed to fetch products" });
     }
   });
 
-  app.get("/api/products/popular", async (req, res) => {
+  app.get("/api/products/popular", async (_req, res) => {
     try {
       const products = await storage.getProductsByCategory("popular");
       res.json(products);
-    } catch (error) {
+    } catch (_error) {
       res.status(500).json({ error: "Failed to fetch popular products" });
     }
   });
 
-  app.get("/api/products/choice", async (req, res) => {
+  app.get("/api/products/choice", async (_req, res) => {
     try {
       const products = await storage.getProductsByCategory("choice");
       res.json(products);
-    } catch (error) {
+    } catch (_error) {
       res.status(500).json({ error: "Failed to fetch choice products" });
     }
   });
 
-  app.get("/api/products/catalog", async (req, res) => {
+  app.get("/api/products/catalog", async (_req, res) => {
     try {
       const allProducts = await storage.getAllProducts();
-      // Return all products except those only in popular/choice categories
       res.json(allProducts);
-    } catch (error) {
+    } catch (_error) {
       res.status(500).json({ error: "Failed to fetch catalog" });
     }
   });
@@ -207,7 +207,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       res.json(product);
-    } catch (error) {
+    } catch (_error) {
       res.status(500).json({ error: "Failed to fetch product" });
     }
   });
@@ -217,8 +217,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const validated = insertProductSchema.parse(req.body);
       const product = await storage.createProduct(validated);
       res.json(product);
-    } catch (error: any) {
-      res.status(400).json({ error: error.message || "Invalid product data" });
+    } catch (error) {
+      res.status(400).json({ error: error?.message || "Invalid product data" });
     }
   });
 
@@ -232,7 +232,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       res.json(updated);
-    } catch (error) {
+    } catch (_error) {
       res.status(500).json({ error: "Failed to update product" });
     }
   });
@@ -247,7 +247,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       res.json({ message: "Product deleted successfully" });
-    } catch (error) {
+    } catch (_error) {
       res.status(500).json({ error: "Failed to delete product" });
     }
   });
@@ -261,17 +261,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const imageUrl = `/uploads/${req.file.filename}`;
       res.json({ url: imageUrl });
-    } catch (error) {
+    } catch (_error) {
       res.status(500).json({ error: "Failed to upload file" });
     }
   });
 
   // Custom Order Routes
-  app.get("/api/orders/custom", requireAuth, async (req, res) => {
+  app.get("/api/orders/custom", requireAuth, async (_req, res) => {
     try {
       const orders = await storage.getAllCustomOrders();
       res.json(orders);
-    } catch (error) {
+    } catch (_error) {
       res.status(500).json({ error: "Failed to fetch orders" });
     }
   });
@@ -281,17 +281,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const validated = insertCustomOrderSchema.parse(req.body);
       const order = await storage.createCustomOrder(validated);
       res.json(order);
-    } catch (error: any) {
-      res.status(400).json({ error: error.message || "Invalid order data" });
+    } catch (error) {
+      res.status(400).json({ error: error?.message || "Invalid order data" });
     }
   });
 
   // Contact Routes
-  app.get("/api/contacts", requireAuth, async (req, res) => {
+  app.get("/api/contacts", requireAuth, async (_req, res) => {
     try {
       const contacts = await storage.getAllContacts();
       res.json(contacts);
-    } catch (error) {
+    } catch (_error) {
       res.status(500).json({ error: "Failed to fetch contacts" });
     }
   });
@@ -301,12 +301,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const validated = insertContactSchema.parse(req.body);
       const contact = await storage.createContact(validated);
       res.json(contact);
-    } catch (error: any) {
-      res.status(400).json({ error: error.message || "Invalid contact data" });
+    } catch (error) {
+      res.status(400).json({ error: error?.message || "Invalid contact data" });
     }
   });
 
   const httpServer = createServer(app);
-
   return httpServer;
 }
