@@ -19,19 +19,25 @@ export default function CatalogSection() {
   });
 
   return (
-    <section className="py-12 sm:py-16 lg:py-20 bg-background" id="catalog">
+    <section className="py-14 sm:py-18 lg:py-24 bg-gradient-to-b from-card/40 to-background" id="catalog">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <h2
-          className="text-3xl sm:text-4xl lg:text-5xl font-bold text-center mb-4"
-          data-testid="heading-catalog"
-        >
-          <span className="bg-gradient-to-r from-primary via-accent to-secondary bg-clip-text text-transparent">
-            Ready to Order
-          </span>
-        </h2>
-        <p className="text-center text-muted-foreground text-lg mb-8">
-          Browse our delicious collection
-        </p>
+        <div className="text-center mb-10">
+          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-accent/20 text-accent-foreground text-sm font-medium mb-4">
+            <span className="w-2 h-2 rounded-full bg-accent-foreground" />
+            Browse our menu
+          </div>
+          <h2
+            className="text-3xl sm:text-4xl lg:text-5xl font-bold"
+            data-testid="heading-catalog"
+          >
+            <span className="bg-gradient-to-r from-primary via-accent to-secondary bg-clip-text text-transparent">
+              Ready to Order
+            </span>
+          </h2>
+          <p className="text-center text-muted-foreground text-lg mt-3">
+            Browse our delicious collection
+          </p>
+        </div>
 
         {/* Category Filter */}
         <div className="flex flex-wrap justify-center gap-3 mb-12">
@@ -40,7 +46,7 @@ export default function CatalogSection() {
               key={category}
               variant={selectedCategory === category ? "default" : "outline"}
               onClick={() => setSelectedCategory(category)}
-              className="min-w-24"
+              className={`min-w-24 rounded-full ${selectedCategory === category ? "" : "bg-card"}`}
               data-testid={`button-category-${category.toLowerCase()}`}
             >
               {category}

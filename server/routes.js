@@ -2,7 +2,8 @@ import { createServer } from "http";
 import { storage } from "./storage.js";
 import multer from "multer";
 import path from "path";
-import { existsSync, mkdirSync } from "fs";
+import { existsSync, mkdirSync, writeFileSync } from "fs";
+import crypto from "crypto";
 import {
   insertSlideshowImageSchema,
   insertProductSchema,
@@ -10,14 +11,14 @@ import {
   insertContactSchema,
 } from "../shared/schema.js";
 
-// Configure multer for file uploads
+// In serverless (Vercel), persist uploads to Vercel Blob; in dev use disk
 const baseUploadDir = process.env.VERCEL ? "/tmp" : process.cwd();
 const uploadDir = path.join(baseUploadDir, "uploads");
 if (!existsSync(uploadDir)) {
   mkdirSync(uploadDir, { recursive: true });
 }
 
-const multerStorage = multer.diskStorage({
+const diskStorage = multer.diskStorage({
   destination: (_req, _file, cb) => {
     cb(null, uploadDir);
   },
@@ -27,9 +28,13 @@ const multerStorage = multer.diskStorage({
   },
 });
 
+const storageEngine =
+  process.env.VERCEL ? multer.memoryStorage() : diskStorage;
+
+// Keep below 5MB to avoid Vercel's serverless request size limits
 const upload = multer({
-  storage: multerStorage,
-  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB
+  storage: storageEngine,
+  limits: { fileSize: 4 * 1024 * 1024 }, // 4MB
   fileFilter: (_req, file, cb) => {
     const allowedTypes = /jpeg|jpg|png|gif|mp4|mov|avi/;
     const extname = allowedTypes.test(
@@ -45,13 +50,102 @@ const upload = multer({
   },
 });
 
+// --- Stateless auth helpers (works on Vercel serverless) ---
+const TOKEN_COOKIE = "auth";
+const TOKEN_TTL_SECONDS = 60 * 60 * 24; // 24h
+const SECRET = process.env.SESSION_SECRET || "bakery-bites-secret-key-2023";
+
+function sign(payload) {
+  const body = Buffer.from(JSON.stringify(payload)).toString("base64url");
+  const hmac = crypto.createHmac("sha256", SECRET).update(body).digest("base64url");
+  return `${body}.${hmac}`;
+}
+
+function verify(token) {
+  if (!token || typeof token !== "string") return null;
+  const parts = token.split(".");
+  if (parts.length !== 2) return null;
+  const [body, sig] = parts;
+  const expected = crypto.createHmac("sha256", SECRET).update(body).digest("base64url");
+  if (!crypto.timingSafeEqual(Buffer.from(sig), Buffer.from(expected))) return null;
+  try {
+    const payload = JSON.parse(Buffer.from(body, "base64url").toString("utf8"));
+    if (payload.exp && Date.now() / 1000 > payload.exp) return null;
+    return payload;
+  } catch {
+    return null;
+  }
+}
+
+function parseCookie(req, name) {
+  const cookie = req.headers?.cookie || "";
+  const parts = cookie.split(";").map((p) => p.trim());
+  for (const part of parts) {
+    if (part.startsWith(name + "=")) {
+      return decodeURIComponent(part.slice(name.length + 1));
+    }
+  }
+  return null;
+}
+
+function setCookie(res, name, value, { maxAge = TOKEN_TTL_SECONDS } = {}) {
+  const cookie = [
+    `${name}=${encodeURIComponent(value)}`,
+    "Path=/",
+    "HttpOnly",
+    "SameSite=Lax",
+    "Secure",
+    `Max-Age=${maxAge}`,
+  ].join("; ");
+  res.setHeader("Set-Cookie", cookie);
+}
+
+// Upload helper: when on Vercel, try Blob first; if it fails, fall back to disk (/tmp/uploads)
+async function persistUploadAndGetUrl(file) {
+  if (process.env.VERCEL) {
+    try {
+      const { put } = await import("@vercel/blob");
+      const ext = path.extname(file.originalname || "") || "";
+      const key = `uploads/${Date.now()}-${Math.round(Math.random() * 1e9)}${ext}`;
+      const result = await put(key, file.buffer, {
+        access: "public",
+        contentType: file.mimetype,
+      });
+      return result.url;
+    } catch (err) {
+      // Fallback to writing to /tmp (ephemeral)
+      const ext = path.extname(file.originalname || "") || "";
+      const filename = `${Date.now()}-${Math.round(Math.random() * 1e9)}${ext}`;
+      const fullPath = path.join(uploadDir, filename);
+      try {
+        writeFileSync(fullPath, file.buffer);
+        return `/uploads/${filename}`;
+      } catch (writeErr) {
+        console.error("Failed to write file to /tmp fallback:", writeErr);
+        throw err;
+      }
+    }
+  } else {
+    // Disk mode: file already saved by multer to uploadDir
+    return `/uploads/${file.filename}`;
+  }
+}
+
 // Authentication middleware
 function requireAuth(req, res, next) {
   if (req.session?.adminId) {
-    next();
-  } else {
-    res.status(401).json({ error: "Unauthorized" });
+    return next();
   }
+  // stateless token fallback
+  const token = parseCookie(req, TOKEN_COOKIE);
+  const payload = verify(token);
+  if (payload?.adminId) {
+    // bridge for downstream code if needed
+    req.session = req.session || {};
+    req.session.adminId = payload.adminId;
+    return next();
+  }
+  res.status(401).json({ error: "Unauthorized" });
 }
 
 export async function registerRoutes(app) {
@@ -72,20 +166,34 @@ export async function registerRoutes(app) {
         return res.status(401).json({ error: "Invalid credentials" });
       }
 
+      // set in-memory session (for non-serverless/dev)
       req.session.adminId = admin.id;
+
+      // also set stateless cookie for serverless environments
+      const token = sign({
+        adminId: admin.id,
+        exp: Math.floor(Date.now() / 1000) + TOKEN_TTL_SECONDS,
+      });
+      setCookie(res, TOKEN_COOKIE, token);
+
       res.json({ message: "Login successful" });
     } catch (error) {
+      console.error("Login error:", error);
       res.status(500).json({ error: "Internal server error" });
     }
   });
 
   app.post("/api/admin/logout", (req, res) => {
-    req.session.destroy((err) => {
-      if (err) {
-        return res.status(500).json({ error: "Failed to logout" });
-      }
+    try {
+      // clear stateless cookie
+      setCookie(res, TOKEN_COOKIE, "", { maxAge: 0 });
+
+      // destroy stateful session if present
+      req.session?.destroy?.(() => {});
       res.json({ message: "Logout successful" });
-    });
+    } catch (err) {
+      res.status(500).json({ error: "Failed to logout" });
+    }
   });
 
   app.get("/api/admin/check", requireAuth, (_req, res) => {
@@ -112,7 +220,8 @@ export async function registerRoutes(app) {
           return res.status(400).json({ error: "No file uploaded" });
         }
 
-        const imageUrl = `/uploads/${req.file.filename}`;
+        const imageUrl = await persistUploadAndGetUrl(req.file);
+
         const images = await storage.getAllSlideshowImages();
         const maxOrder =
           images.length > 0 ? Math.max(...images.map((i) => i.order)) : -1;
@@ -124,7 +233,8 @@ export async function registerRoutes(app) {
         });
 
         res.json(newImage);
-      } catch (_error) {
+      } catch (error) {
+        console.error("Slideshow upload error:", error);
         res.status(500).json({ error: "Failed to upload image" });
       }
     }
@@ -253,15 +363,16 @@ export async function registerRoutes(app) {
   });
 
   // File Upload Route (for product images)
-  app.post("/api/upload", requireAuth, upload.single("image"), (req, res) => {
+  app.post("/api/upload", requireAuth, upload.single("image"), async (req, res) => {
     try {
       if (!req.file) {
         return res.status(400).json({ error: "No file uploaded" });
       }
 
-      const imageUrl = `/uploads/${req.file.filename}`;
+      const imageUrl = await persistUploadAndGetUrl(req.file);
       res.json({ url: imageUrl });
-    } catch (_error) {
+    } catch (error) {
+      console.error("File upload error:", error);
       res.status(500).json({ error: "Failed to upload file" });
     }
   });

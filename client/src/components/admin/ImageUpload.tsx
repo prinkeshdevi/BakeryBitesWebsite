@@ -13,7 +13,7 @@ interface ImageUploadProps {
 export default function ImageUpload({
   onUpload,
   accept = "image/*,video/*",
-  maxSizeMB = 10,
+  maxSizeMB = 4,
 }: ImageUploadProps) {
   const [isDragging, setIsDragging] = useState(false);
   const [preview, setPreview] = useState<string | null>(null);

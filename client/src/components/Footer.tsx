@@ -2,7 +2,7 @@ import { Instagram, Phone, Mail } from "lucide-react";
 
 export default function Footer() {
   return (
-    <footer className="bg-foreground text-background py-12">
+    <footer className="bg-foreground text-background pt-12">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-8">
           {/* About */}
@@ -80,12 +80,16 @@ export default function Footer() {
             </ul>
           </div>
         </div>
+      </div>
 
-        {/* Copyright */}
-        <div className="border-t border-background/20 pt-8 text-center">
-          <p className="text-background/60 text-sm" data-testid="text-copyright">
-            © 2023 Bakery Bites. All rights reserved.
-          </p>
+      {/* Bottom bar */}
+      <div className="mt-8 bg-background/5">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="border-t border-background/10 pt-6 pb-8 text-center">
+            <p className="text-background/60 text-sm" data-testid="text-copyright">
+              © 2023 Bakery Bites. All rights reserved.
+            </p>
+          </div>
         </div>
       </div>
     </footer>

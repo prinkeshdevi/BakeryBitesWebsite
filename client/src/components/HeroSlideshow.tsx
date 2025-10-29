@@ -79,25 +79,39 @@ export default function HeroSlideshow() {
             className="w-full h-full object-cover"
           />
           {/* Gradient Overlay */}
-          <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/30 to-transparent" />
+          <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/30 to-transparent" />
           
           {/* Content */}
           <div className="absolute inset-0 flex items-center justify-center">
             <div className="text-center px-4 max-w-4xl">
+              <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/10 text-white backdrop-blur mb-4 animate-in fade-in duration-700">
+                <span className="w-2 h-2 rounded-full bg-primary" />
+                Freshly baked • 100% Eggless • Custom Designs
+              </div>
               <h1 className="text-4xl sm:text-5xl lg:text-6xl xl:text-7xl font-bold text-white mb-4 drop-shadow-lg animate-in fade-in slide-in-from-bottom-4 duration-700">
                 {slide.title}
               </h1>
               <p className="text-lg sm:text-xl lg:text-2xl text-white/90 mb-8 drop-shadow-md animate-in fade-in slide-in-from-bottom-4 duration-700 delay-150">
                 {slide.subtitle}
               </p>
-              <Button
-                size="lg"
-                className="px-8 py-6 text-lg backdrop-blur-sm bg-primary/90 hover:bg-primary animate-in fade-in slide-in-from-bottom-4 duration-700 delay-300"
-                asChild
-                data-testid="button-order-hero"
-              >
-                <a href="tel:+918788463432">Order Now</a>
-              </Button>
+              <div className="flex items-center justify-center gap-3">
+                <Button
+                  size="lg"
+                  className="px-8 py-6 text-lg rounded-full backdrop-blur-sm bg-primary/90 hover:bg-primary animate-in fade-in slide-in-from-bottom-4 duration-700 delay-300"
+                  asChild
+                  data-testid="button-order-hero"
+                >
+                  <a href="tel:+918788463432">Order Now</a>
+                </Button>
+                <Button
+                  size="lg"
+                  variant="outline"
+                  className="px-8 py-6 text-lg rounded-full border-white/40 text-white hover:bg-white/10 backdrop-blur-sm animate-in fade-in slide-in-from-bottom-4 duration-700 delay-300"
+                  asChild
+                >
+                  <a href="#catalog">Browse Catalog</a>
+                </Button>
+              </div>
             </div>
           </div>
         </div>
@@ -129,11 +143,12 @@ export default function HeroSlideshow() {
           <button
             key={index}
             onClick={() => goToSlide(index)}
-            className={`w-3 h-3 rounded-full transition-all duration-300 ${
+            className={`h-2 rounded-full transition-all duration-300 ${
               index === currentSlide
                 ? "bg-white w-8"
-                : "bg-white/50 hover:bg-white/75"
+                : "bg-white/50 hover:bg-white/75 w-2"
             }`}
+            aria-label={`Go to slide ${index + 1}`}
             data-testid={`button-slide-${index}`}
           />
         ))}
