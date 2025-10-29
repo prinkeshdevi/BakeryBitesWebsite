@@ -8,15 +8,29 @@ async function throwIfResNotOk(res) {
 }
 
 export async function apiRequest(method, url, data) {
+  const isFormData =
+    typeof FormData !== "undefined" && data instanceof FormData;
+
   const res = await fetch(url, {
     method,
-    headers: data ? { "Content-Type": "application/json" } : {},
-    body: data ? JSON.stringify(data) : undefined,
+    headers:
+      !isFormData && data ? { "Content-Type": "application/json" } : undefined,
+    body: data
+      ? isFormData
+        ? data
+        : JSON.stringify(data)
+      : undefined,
     credentials: "include",
   });
 
   await throwIfResNotOk(res);
-  return res;
+
+  const contentType = res.headers.get("content-type") || "";
+  if (contentType.includes("application/json")) {
+    return await res.json();
+  }
+  // Fallback for non-JSON responses
+  return await res.text();
 }
 
 export const getQueryFn = ({ on401: unauthorizedBehavior }) => {
