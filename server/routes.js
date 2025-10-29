@@ -3,6 +3,7 @@ import { storage } from "./storage.js";
 import multer from "multer";
 import path from "path";
 import { existsSync, mkdirSync } from "fs";
+import crypto from "crypto";
 import {
   insertSlideshowImageSchema,
   insertProductSchema,
@@ -45,13 +46,71 @@ const upload = multer({
   },
 });
 
+// --- Stateless auth helpers (works on Vercel serverless) ---
+const TOKEN_COOKIE = "auth";
+const TOKEN_TTL_SECONDS = 60 * 60 * 24; // 24h
+const SECRET = process.env.SESSION_SECRET || "bakery-bites-secret-key-2023";
+
+function sign(payload) {
+  const body = Buffer.from(JSON.stringify(payload)).toString("base64url");
+  const hmac = crypto.createHmac("sha256", SECRET).update(body).digest("base64url");
+  return `${body}.${hmac}`;
+}
+
+function verify(token) {
+  if (!token || typeof token !== "string") return null;
+  const parts = token.split(".");
+  if (parts.length !== 2) return null;
+  const [body, sig] = parts;
+  const expected = crypto.createHmac("sha256", SECRET).update(body).digest("base64url");
+  if (!crypto.timingSafeEqual(Buffer.from(sig), Buffer.from(expected))) return null;
+  try {
+    const payload = JSON.parse(Buffer.from(body, "base64url").toString("utf8"));
+    if (payload.exp && Date.now() / 1000 > payload.exp) return null;
+    return payload;
+  } catch {
+    return null;
+  }
+}
+
+function parseCookie(req, name) {
+  const cookie = req.headers?.cookie || "";
+  const parts = cookie.split(";").map((p) => p.trim());
+  for (const part of parts) {
+    if (part.startsWith(name + "=")) {
+      return decodeURIComponent(part.slice(name.length + 1));
+    }
+  }
+  return null;
+}
+
+function setCookie(res, name, value, { maxAge = TOKEN_TTL_SECONDS } = {}) {
+  const cookie = [
+    `${name}=${encodeURIComponent(value)}`,
+    "Path=/",
+    "HttpOnly",
+    "SameSite=Lax",
+    "Secure",
+    `Max-Age=${maxAge}`,
+  ].join("; ");
+  res.setHeader("Set-Cookie", cookie);
+}
+
 // Authentication middleware
 function requireAuth(req, res, next) {
   if (req.session?.adminId) {
-    next();
-  } else {
-    res.status(401).json({ error: "Unauthorized" });
+    return next();
   }
+  // stateless token fallback
+  const token = parseCookie(req, TOKEN_COOKIE);
+  const payload = verify(token);
+  if (payload?.adminId) {
+    // bridge for downstream code if needed
+    req.session = req.session || {};
+    req.session.adminId = payload.adminId;
+    return next();
+  }
+  res.status(401).json({ error: "Unauthorized" });
 }
 
 export async function registerRoutes(app) {
@@ -72,20 +131,34 @@ export async function registerRoutes(app) {
         return res.status(401).json({ error: "Invalid credentials" });
       }
 
+      // set in-memory session (for non-serverless/dev)
       req.session.adminId = admin.id;
+
+      // also set stateless cookie for serverless environments
+      const token = sign({
+        adminId: admin.id,
+        exp: Math.floor(Date.now() / 1000) + TOKEN_TTL_SECONDS,
+      });
+      setCookie(res, TOKEN_COOKIE, token);
+
       res.json({ message: "Login successful" });
     } catch (error) {
+      console.error("Login error:", error);
       res.status(500).json({ error: "Internal server error" });
     }
   });
 
   app.post("/api/admin/logout", (req, res) => {
-    req.session.destroy((err) => {
-      if (err) {
-        return res.status(500).json({ error: "Failed to logout" });
-      }
+    try {
+      // clear stateless cookie
+      setCookie(res, TOKEN_COOKIE, "", { maxAge: 0 });
+
+      // destroy stateful session if present
+      req.session?.destroy?.(() => {});
       res.json({ message: "Logout successful" });
-    });
+    } catch (err) {
+      res.status(500).json({ error: "Failed to logout" });
+    }
   });
 
   app.get("/api/admin/check", requireAuth, (_req, res) => {
@@ -124,7 +197,8 @@ export async function registerRoutes(app) {
         });
 
         res.json(newImage);
-      } catch (_error) {
+      } catch (error) {
+        console.error("Slideshow upload error:", error);
         res.status(500).json({ error: "Failed to upload image" });
       }
     }
@@ -261,7 +335,8 @@ export async function registerRoutes(app) {
 
       const imageUrl = `/uploads/${req.file.filename}`;
       res.json({ url: imageUrl });
-    } catch (_error) {
+    } catch (error) {
+      console.error("File upload error:", error);
       res.status(500).json({ error: "Failed to upload file" });
     }
   });
