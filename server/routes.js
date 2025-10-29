@@ -2,7 +2,7 @@ import { createServer } from "http";
 import { storage } from "./storage.js";
 import multer from "multer";
 import path from "path";
-import { existsSync, mkdirSync } from "fs";
+import { existsSync, mkdirSync, writeFileSync } from "fs";
 import crypto from "crypto";
 import {
   insertSlideshowImageSchema,
@@ -31,9 +31,10 @@ const diskStorage = multer.diskStorage({
 const storageEngine =
   process.env.VERCEL ? multer.memoryStorage() : diskStorage;
 
+// Keep below 5MB to avoid Vercel's serverless request size limits
 const upload = multer({
   storage: storageEngine,
-  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB
+  limits: { fileSize: 4 * 1024 * 1024 }, // 4MB
   fileFilter: (_req, file, cb) => {
     const allowedTypes = /jpeg|jpg|png|gif|mp4|mov|avi/;
     const extname = allowedTypes.test(
@@ -99,19 +100,31 @@ function setCookie(res, name, value, { maxAge = TOKEN_TTL_SECONDS } = {}) {
   res.setHeader("Set-Cookie", cookie);
 }
 
-// Upload helper: when on Vercel, store in Blob and return public URL,
-// otherwise store on disk and return /uploads path
+// Upload helper: when on Vercel, try Blob first; if it fails, fall back to disk (/tmp/uploads)
 async function persistUploadAndGetUrl(file) {
   if (process.env.VERCEL) {
-    // Use @vercel/blob to persist the file
-    const { put } = await import("@vercel/blob");
-    const ext = path.extname(file.originalname || "") || "";
-    const key = `uploads/${Date.now()}-${Math.round(Math.random() * 1e9)}${ext}`;
-    const result = await put(key, file.buffer, {
-      access: "public",
-      contentType: file.mimetype,
-    });
-    return result.url;
+    try {
+      const { put } = await import("@vercel/blob");
+      const ext = path.extname(file.originalname || "") || "";
+      const key = `uploads/${Date.now()}-${Math.round(Math.random() * 1e9)}${ext}`;
+      const result = await put(key, file.buffer, {
+        access: "public",
+        contentType: file.mimetype,
+      });
+      return result.url;
+    } catch (err) {
+      // Fallback to writing to /tmp (ephemeral)
+      const ext = path.extname(file.originalname || "") || "";
+      const filename = `${Date.now()}-${Math.round(Math.random() * 1e9)}${ext}`;
+      const fullPath = path.join(uploadDir, filename);
+      try {
+        writeFileSync(fullPath, file.buffer);
+        return `/uploads/${filename}`;
+      } catch (writeErr) {
+        console.error("Failed to write file to /tmp fallback:", writeErr);
+        throw err;
+      }
+    }
   } else {
     // Disk mode: file already saved by multer to uploadDir
     return `/uploads/${file.filename}`;
