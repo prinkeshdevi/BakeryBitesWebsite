@@ -7,16 +7,40 @@ async function throwIfResNotOk(res) {
   }
 }
 
-export async function apiRequest(method, url, data) {
-  const res = await fetch(url, {
-    method,
-    headers: data ? { "Content-Type": "application/json" } : {},
-    body: data ? JSON.stringify(data) : undefined,
-    credentials: "include",
-  });
+function isFormData(data) {
+  return typeof FormData !== "undefined" && data instanceof FormData;
+}
 
+export async function apiRequest(method, url, data) {
+  const init = {
+    method,
+    credentials: "include",
+  };
+
+  if (data !== undefined && data !== null) {
+    if (isFormData(data)) {
+      // Let the browser set the correct multipart/form-data headers with boundary
+      init.body = data;
+    } else {
+      init.headers = { "Content-Type": "application/json" };
+      init.body = JSON.stringify(data);
+    }
+  }
+
+  const res = await fetch(url, init);
   await throwIfResNotOk(res);
-  return res;
+
+  // Try to parse JSON responses by default; fall back to text if not JSON
+  const contentType = res.headers.get("content-type") || "";
+  if (contentType.includes("application/json")) {
+    // If there's no body, return null
+    const text = await res.text();
+    if (!text) return null;
+    return JSON.parse(text);
+  }
+
+  // For non-JSON responses, return raw text
+  return await res.text();
 }
 
 export const getQueryFn = ({ on401: unauthorizedBehavior }) => {
