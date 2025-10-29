@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, MouseEvent, TouchEvent, KeyboardEvent } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import hero1 from "@assets/generated_images/Pink_birthday_cake_hero_1b0daf87.png";
@@ -38,21 +38,44 @@ const slides = [
 export default function HeroSlideshow() {
   const [currentSlide, setCurrentSlide] = useState(0);
   const [isAutoPlaying, setIsAutoPlaying] = useState(true);
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const resumeTimerRef = useRef<number | null>(null);
+  const touchStartXRef = useRef<number | null>(null);
 
+  // Auto-play with visibility pause
   useEffect(() => {
     if (!isAutoPlaying) return;
 
-    const interval = setInterval(() => {
+    const interval = window.setInterval(() => {
       setCurrentSlide((prev) => (prev + 1) % slides.length);
     }, 5000);
 
-    return () => clearInterval(interval);
+    const handleVisibility = () => {
+      if (document.hidden) {
+        setIsAutoPlaying(false);
+      }
+    };
+    document.addEventListener("visibilitychange", handleVisibility);
+
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener("visibilitychange", handleVisibility);
+    };
   }, [isAutoPlaying]);
+
+  const temporarilyPauseAutoPlay = (ms = 10000) => {
+    setIsAutoPlaying(false);
+    if (resumeTimerRef.current) {
+      window.clearTimeout(resumeTimerRef.current);
+    }
+    resumeTimerRef.current = window.setTimeout(() => {
+      setIsAutoPlaying(true);
+    }, ms) as unknown as number;
+  };
 
   const goToSlide = (index: number) => {
     setCurrentSlide(index);
-    setIsAutoPlaying(false);
-    setTimeout(() => setIsAutoPlaying(true), 10000);
+    temporarilyPauseAutoPlay();
   };
 
   const nextSlide = () => {
@@ -63,8 +86,57 @@ export default function HeroSlideshow() {
     goToSlide((currentSlide - 1 + slides.length) % slides.length);
   };
 
+  // Pause on hover/focus, resume on leave/blur
+  const handleMouseEnter = (_e: MouseEvent) => {
+    setIsAutoPlaying(false);
+  };
+  const handleMouseLeave = (_e: MouseEvent) => {
+    temporarilyPauseAutoPlay(4000);
+  };
+  const handleFocus = () => setIsAutoPlaying(false);
+  const handleBlur = () => temporarilyPauseAutoPlay(4000);
+
+  // Keyboard navigation
+  const handleKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
+    if (e.key === "ArrowRight") nextSlide();
+    if (e.key === "ArrowLeft") prevSlide();
+  };
+
+  // Touch swipe
+  const onTouchStart = (e: TouchEvent<HTMLDivElement>) => {
+    touchStartXRef.current = e.touches[0]?.clientX ?? null;
+  };
+  const onTouchEnd = (e: TouchEvent<HTMLDivElement>) => {
+    const startX = touchStartXRef.current;
+    if (startX == null) return;
+    const endX = e.changedTouches[0]?.clientX ?? startX;
+    const delta = endX - startX;
+    const threshold = 40; // px
+    if (delta > threshold) {
+      // swipe right -> previous
+      prevSlide();
+    } else if (delta < -threshold) {
+      // swipe left -> next
+      nextSlide();
+    }
+    touchStartXRef.current = null;
+  };
+
   return (
-    <div className="relative w-full h-[70vh] lg:h-[80vh] overflow-hidden">
+    <div
+      ref={containerRef}
+      className="relative w-full h-[70vh] lg:h-[80vh] overflow-hidden"
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
+      onFocus={handleFocus}
+      onBlur={handleBlur}
+      onKeyDown={handleKeyDown}
+      onTouchStart={onTouchStart}
+      onTouchEnd={onTouchEnd}
+      tabIndex={0}
+      aria-roledescription="carousel"
+      aria-label="Featured bakery items"
+    >
       {/* Slides */}
       {slides.map((slide, index) => (
         <div
@@ -72,6 +144,7 @@ export default function HeroSlideshow() {
           className={`absolute inset-0 transition-opacity duration-1000 ${
             index === currentSlide ? "opacity-100" : "opacity-0"
           }`}
+          aria-hidden={index !== currentSlide}
         >
           <img
             src={slide.image}
@@ -107,8 +180,9 @@ export default function HeroSlideshow() {
       <Button
         variant="ghost"
         size="icon"
-        className="absolute left-4 top-1/2 -translate-y-1/2 bg-white/10 backdrop-blur-md hover:bg-white/20 text-white"
+        className="absolute left-4 top-1/2 -translate-y-1/2 bg-white/15 backdrop-blur-md hover:bg-white/25 text-white rounded-full w-12 h-12 sm:w-12 sm:h-12 shadow-md transition-transform duration-200 hover:scale-105 focus-visible:ring-2 focus-visible:ring-white/70"
         onClick={prevSlide}
+        aria-label="Previous slide"
         data-testid="button-prev-slide"
       >
         <ChevronLeft className="w-6 h-6" />
@@ -116,27 +190,31 @@ export default function HeroSlideshow() {
       <Button
         variant="ghost"
         size="icon"
-        className="absolute right-4 top-1/2 -translate-y-1/2 bg-white/10 backdrop-blur-md hover:bg-white/20 text-white"
+        className="absolute right-4 top-1/2 -translate-y-1/2 bg-white/15 backdrop-blur-md hover:bg-white/25 text-white rounded-full w-12 h-12 sm:w-12 sm:h-12 shadow-md transition-transform duration-200 hover:scale-105 focus-visible:ring-2 focus-visible:ring-white/70"
         onClick={nextSlide}
+        aria-label="Next slide"
         data-testid="button-next-slide"
       >
         <ChevronRight className="w-6 h-6" />
       </Button>
 
       {/* Dot Indicators */}
-      <div className="absolute bottom-8 left-1/2 -translate-x-1/2 flex space-x-3">
-        {slides.map((_, index) => (
-          <button
-            key={index}
-            onClick={() => goToSlide(index)}
-            className={`w-3 h-3 rounded-full transition-all duration-300 ${
-              index === currentSlide
-                ? "bg-white w-8"
-                : "bg-white/50 hover:bg-white/75"
-            }`}
-            data-testid={`button-slide-${index}`}
-          />
-        ))}
+      <div className="absolute bottom-8 left-1/2 -translate-x-1/2 flex items-center space-x-3">
+        {slides.map((_, index) => {
+          const active = index === currentSlide;
+          return (
+            <button
+              key={index}
+              onClick={() => goToSlide(index)}
+              className={`h-2.5 rounded-full transition-all duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 ${
+                active ? "bg-white w-8" : "bg-white/60 hover:bg-white/80 w-2.5"
+              }`}
+              aria-label={`Go to slide ${index + 1}`}
+              aria-current={active ? "true" : "false"}
+              data-testid={`button-slide-${index}`}
+            />
+          );
+        })}
       </div>
     </div>
   );
