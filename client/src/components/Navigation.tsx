@@ -7,7 +7,7 @@ export default function Navigation() {
   const [isOpen, setIsOpen] = useState(false);
 
   return (
-    <nav className="sticky top-0 z-50 w-full bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 border-b border-border">
+    <nav className="sticky top-0 z-50 w-full bg-background/90 backdrop-blur supports-[backdrop-filter]:bg-background/75 border-b border-border shadow-sm">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16 lg:h-20">
           {/* Logo */}
@@ -34,7 +34,7 @@ export default function Navigation() {
               href="https://www.instagram.com/bakery_bites21/?hl=eng"
               target="_blank"
               rel="noopener noreferrer"
-              className="flex items-center space-x-2 hover-elevate rounded-lg px-4 py-2 transition-all duration-300"
+              className="flex items-center space-x-2 hover-elevate rounded-full px-5 py-2 transition-all duration-300 bg-card border"
               data-testid="link-instagram"
             >
               <Instagram className="w-5 h-5 text-primary" />
@@ -42,6 +42,7 @@ export default function Navigation() {
             </a>
             <Button
               variant="default"
+              className="rounded-full px-6"
               asChild
               data-testid="button-order"
             >
@@ -79,7 +80,7 @@ export default function Navigation() {
             </a>
             <Button
               variant="default"
-              className="w-full"
+              className="w-full rounded-full"
               asChild
               data-testid="button-order-mobile"
             >
