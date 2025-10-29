@@ -6,6 +6,9 @@ import path from "path";
 
 const app = express();
 
+// behind proxies (Vercel/other), trust proxy for secure cookies/session
+app.set("trust proxy", 1);
+
 app.use(
   session({
     secret: process.env.SESSION_SECRET || "bakery-bites-secret-key-2023",
