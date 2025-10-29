@@ -11,14 +11,14 @@ import {
   insertContactSchema,
 } from "../shared/schema.js";
 
-// Configure multer for file uploads
+// In serverless (Vercel), persist uploads to Vercel Blob; in dev use disk
 const baseUploadDir = process.env.VERCEL ? "/tmp" : process.cwd();
 const uploadDir = path.join(baseUploadDir, "uploads");
 if (!existsSync(uploadDir)) {
   mkdirSync(uploadDir, { recursive: true });
 }
 
-const multerStorage = multer.diskStorage({
+const diskStorage = multer.diskStorage({
   destination: (_req, _file, cb) => {
     cb(null, uploadDir);
   },
@@ -28,8 +28,11 @@ const multerStorage = multer.diskStorage({
   },
 });
 
+const storageEngine =
+  process.env.VERCEL ? multer.memoryStorage() : diskStorage;
+
 const upload = multer({
-  storage: multerStorage,
+  storage: storageEngine,
   limits: { fileSize: 10 * 1024 * 1024 }, // 10MB
   fileFilter: (_req, file, cb) => {
     const allowedTypes = /jpeg|jpg|png|gif|mp4|mov|avi/;
@@ -94,6 +97,25 @@ function setCookie(res, name, value, { maxAge = TOKEN_TTL_SECONDS } = {}) {
     `Max-Age=${maxAge}`,
   ].join("; ");
   res.setHeader("Set-Cookie", cookie);
+}
+
+// Upload helper: when on Vercel, store in Blob and return public URL,
+// otherwise store on disk and return /uploads path
+async function persistUploadAndGetUrl(file) {
+  if (process.env.VERCEL) {
+    // Use @vercel/blob to persist the file
+    const { put } = await import("@vercel/blob");
+    const ext = path.extname(file.originalname || "") || "";
+    const key = `uploads/${Date.now()}-${Math.round(Math.random() * 1e9)}${ext}`;
+    const result = await put(key, file.buffer, {
+      access: "public",
+      contentType: file.mimetype,
+    });
+    return result.url;
+  } else {
+    // Disk mode: file already saved by multer to uploadDir
+    return `/uploads/${file.filename}`;
+  }
 }
 
 // Authentication middleware
@@ -185,7 +207,8 @@ export async function registerRoutes(app) {
           return res.status(400).json({ error: "No file uploaded" });
         }
 
-        const imageUrl = `/uploads/${req.file.filename}`;
+        const imageUrl = await persistUploadAndGetUrl(req.file);
+
         const images = await storage.getAllSlideshowImages();
         const maxOrder =
           images.length > 0 ? Math.max(...images.map((i) => i.order)) : -1;
@@ -327,13 +350,13 @@ export async function registerRoutes(app) {
   });
 
   // File Upload Route (for product images)
-  app.post("/api/upload", requireAuth, upload.single("image"), (req, res) => {
+  app.post("/api/upload", requireAuth, upload.single("image"), async (req, res) => {
     try {
       if (!req.file) {
         return res.status(400).json({ error: "No file uploaded" });
       }
 
-      const imageUrl = `/uploads/${req.file.filename}`;
+      const imageUrl = await persistUploadAndGetUrl(req.file);
       res.json({ url: imageUrl });
     } catch (error) {
       console.error("File upload error:", error);
