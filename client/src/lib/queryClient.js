@@ -7,16 +7,30 @@ async function throwIfResNotOk(res) {
   }
 }
 
+/**
+ * Unified API request helper.
+ * - When data is FormData, lets the browser set multipart headers and sends it directly.
+ * - When data is a plain object, sends JSON.
+ * - Returns parsed JSON when available, otherwise returns null.
+ */
 export async function apiRequest(method, url, data) {
+  const isFormData = typeof FormData !== "undefined" && data instanceof FormData;
+
   const res = await fetch(url, {
     method,
-    headers: data ? { "Content-Type": "application/json" } : {},
-    body: data ? JSON.stringify(data) : undefined,
+    headers: isFormData ? {} : data ? { "Content-Type": "application/json" } : {},
+    body: isFormData ? data : data ? JSON.stringify(data) : undefined,
     credentials: "include",
   });
 
   await throwIfResNotOk(res);
-  return res;
+
+  // Try to parse JSON response, fallback to null
+  const contentType = res.headers.get("content-type") || "";
+  if (contentType.includes("application/json")) {
+    return await res.json();
+  }
+  return null;
 }
 
 export const getQueryFn = ({ on401: unauthorizedBehavior }) => {
