@@ -6,6 +6,9 @@ import path from "path";
 
 const app = express();
 
+// behind proxies (Vercel/other), trust proxy for secure cookies/session
+app.set("trust proxy", 1);
+
 app.use(
   session({
     secret: process.env.SESSION_SECRET || "bakery-bites-secret-key-2023",
@@ -20,7 +23,9 @@ app.use(
 );
 
 // Serve uploaded files
-app.use("/uploads", express.static(path.join(process.cwd(), "uploads")));
+// In Vercel/serverless, multer saves to /tmp (see routes.js). Mirror that here.
+const baseUploadDir = process.env.VERCEL ? "/tmp" : process.cwd();
+app.use("/uploads", express.static(path.join(baseUploadDir, "uploads")));
 
 // Serve generated assets
 app.use("/assets", express.static(path.join(process.cwd(), "attached_assets")));

@@ -1,19 +1,32 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import path from "path";
-import runtimeErrorOverlay from "@replit/vite-plugin-runtime-error-modal";
 import { fileURLToPath } from "url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 export default defineConfig(async () => {
-  const plugins = [react(), runtimeErrorOverlay()];
+  const plugins = [react()];
+
+  // Only load runtime error overlay in development to avoid build issues on CI
+  if (process.env.NODE_ENV !== "production") {
+    try {
+      const { default: runtimeErrorOverlay } = await import("@replit/vite-plugin-runtime-error-modal");
+      plugins.push(runtimeErrorOverlay());
+    } catch {
+      // plugin is optional outside Replit
+    }
+  }
 
   // Load Replit-only dev plugins dynamically to avoid build-time TLA issues
   if (process.env.NODE_ENV !== "production" && process.env.REPL_ID !== undefined) {
-    const { cartographer } = await import("@replit/vite-plugin-cartographer");
-    const { devBanner } = await import("@replit/vite-plugin-dev-banner");
-    plugins.push(cartographer(), devBanner());
+    try {
+      const { cartographer } = await import("@replit/vite-plugin-cartographer");
+      const { devBanner } = await import("@replit/vite-plugin-dev-banner");
+      plugins.push(cartographer(), devBanner());
+    } catch {
+      // ignore if unavailable in CI
+    }
   }
 
   return {

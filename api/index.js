@@ -5,6 +5,9 @@ import { registerRoutes } from "../server/routes.js";
 
 const app = express();
 
+// trust proxy so secure cookies work behind Vercel's proxy
+app.set("trust proxy", 1);
+
 app.use(
   session({
     secret: process.env.SESSION_SECRET || "bakery-bites-secret-key-2023",
